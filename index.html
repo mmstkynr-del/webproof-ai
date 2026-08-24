@@ -4,9 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebProof AI - Profesyonel Dil ve İçerik Denetimi</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Inter', sans-serif; }</style>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
     <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
@@ -34,17 +39,15 @@
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-12 shadow-2xl max-w-4xl mx-auto">
             <form id="scanForm" class="space-y-4">
                 <div class="flex flex-col sm:flex-row gap-3">
-                    <input 
-                        type="url" 
-                        id="targetUrl"
-                        required
-                        value="https://www.bbc.com/turkce"
-                        placeholder="https://www.bbc.com/turkce"
-                        class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-sky-500 transition"
-                    />
+                    <input type="url" id="targetUrl" required value="https://www.bbc.com/turkce" placeholder="https://www.bbc.com/turkce" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-sky-500 transition" />
                     <button type="submit" id="submitBtn" class="bg-sky-500 hover:bg-sky-600 text-white font-semibold px-6 py-3 rounded-xl flex items-center justify-center transition shrink-0 min-w-[160px]">
                         <span>Derinlemesine Tara</span>
                     </button>
+                </div>
+                <!-- İsteğe bağlı Scraper API anahtarı (gizli) -->
+                <div class="text-xs text-slate-500 flex justify-end">
+                    <span class="opacity-60">🔑 Scraper API anahtarınız varsa:</span>
+                    <input type="text" id="scraperApiKey" placeholder="Anahtar (opsiyonel)" class="ml-2 w-48 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:border-sky-500" />
                 </div>
             </form>
         </div>
@@ -88,6 +91,9 @@
     </main>
 
     <script>
+        // --------------------------------------------------------------
+        // 1. TÜRKÇE İMLA KURALLARI (aynı, değişmedi)
+        // --------------------------------------------------------------
         const SPELL_RULES_TR = [
             { pattern: /\bherkez\b/gi, correct: "herkes", type: "YAZIM HATASI", desc: "Türkçede 'herkez' kullanımı hatalıdır, doğrusu 'herkes'tir." },
             { pattern: /\bherşey\b/gi, correct: "her şey", type: "YAZIM HATASI", desc: "'Şey' sözcüğü her zaman ayrı yazılır." },
@@ -98,6 +104,9 @@
             { pattern: /\borjinal\b/gi, correct: "orijinal", type: "YAZIM HATASI", desc: "Doğru kullanımı 'orijinal' şeklindedir." }
         ];
 
+        // --------------------------------------------------------------
+        // 2. DOM REFERANSLARI
+        // --------------------------------------------------------------
         const scanForm = document.getElementById('scanForm');
         const progressBox = document.getElementById('progressBox');
         const progressBar = document.getElementById('progressBar');
@@ -105,88 +114,214 @@
         const statusText = document.getElementById('statusText');
         const resultsContainer = document.getElementById('resultsContainer');
         const findingsList = document.getElementById('findingsList');
+        const targetUrlInput = document.getElementById('targetUrl');
+        const scraperApiKeyInput = document.getElementById('scraperApiKey');
 
+        // --------------------------------------------------------------
+        // 3. TARAYICI HEADER'LARI (Gerçekçi)
+        // --------------------------------------------------------------
+        const BROWSER_HEADERS = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+            'Connection': 'keep-alive'
+        };
+
+        // --------------------------------------------------------------
+        // 4. PROXY LİSTESİ (Öncelik sırasına göre)
+        // --------------------------------------------------------------
+        function buildProxyList(targetUrl, apiKey) {
+            const encoded = encodeURIComponent(targetUrl);
+            const proxies = [
+                // 1. AllOrigins (JSON)
+                { url: `https://api.allorigins.win/get?url=${encoded}`, type: 'json' },
+                // 2. CorsProxy.io (text)
+                { url: `https://corsproxy.io/?${encoded}`, type: 'text' },
+                // 3. CodeTabs (text)
+                { url: `https://api.codetabs.com/v1/proxy?quest=${encoded}`, type: 'text' },
+                // 4. CORS Anywhere (text) - bazen throttle olur, yine de dene
+                { url: `https://cors-anywhere.herokuapp.com/${targetUrl}`, type: 'text' },
+                // 5. Cors.sh (text)
+                { url: `https://proxy.cors.sh/${targetUrl}`, type: 'text' },
+                // 6. ThingProxy (text)
+                { url: `https://thingproxy.freeboard.io/fetch/${targetUrl}`, type: 'text' }
+            ];
+
+            // Eğer Scraper API anahtarı girilmişse, ScrapingAnt'i ekle (ücretsiz tier)
+            if (apiKey && apiKey.trim().length > 0) {
+                proxies.push({
+                    url: `https://api.scrapingant.com/v2/general?url=${encoded}&x-api-key=${apiKey.trim()}`,
+                    type: 'json' // ScrapingAnt JSON döner, içinde 'content' alanı var
+                });
+            }
+
+            return proxies;
+        }
+
+        // --------------------------------------------------------------
+        // 5. CLOUDFLARE CHALLENGE TESPİTİ
+        // --------------------------------------------------------------
+        function isCloudflareChallenge(html) {
+            if (!html || typeof html !== 'string') return false;
+            const lower = html.toLowerCase();
+            return lower.includes('just a moment') ||
+                lower.includes('cf-browser-verification') ||
+                lower.includes('ray id') ||
+                lower.includes('cloudflare') && lower.includes('security check') ||
+                lower.includes('attention required');
+        }
+
+        // --------------------------------------------------------------
+        // 6. BİR PROXY'DEN VERİ ÇEKME (retry destekli)
+        // --------------------------------------------------------------
+        async function fetchViaProxy(proxy, timeout = 15000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeout);
+
+            try {
+                const response = await fetch(proxy.url, {
+                    method: 'GET',
+                    headers: BROWSER_HEADERS,
+                    signal: controller.signal
+                });
+                clearTimeout(timer);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                let rawHtml = '';
+                if (proxy.type === 'json') {
+                    const json = await response.json();
+                    // AllOrigins -> contents, ScrapingAnt -> content
+                    rawHtml = json.contents || json.content || JSON.stringify(json);
+                } else {
+                    rawHtml = await response.text();
+                }
+
+                // Cloudflare challenge mı?
+                if (isCloudflareChallenge(rawHtml)) {
+                    throw new Error('Cloudflare challenge detected');
+                }
+
+                // Başarılı sayılması için en az 200 karakter olsun
+                if (rawHtml.length < 200) {
+                    throw new Error('Content too short (likely blocked)');
+                }
+
+                return rawHtml;
+            } catch (err) {
+                clearTimeout(timer);
+                throw err;
+            }
+        }
+
+        // --------------------------------------------------------------
+        // 7. ANA TARAMA FONKSİYONU (form submit)
+        // --------------------------------------------------------------
         scanForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const targetUrl = document.getElementById('targetUrl').value.trim();
 
+            const targetUrl = targetUrlInput.value.trim();
+            const apiKey = scraperApiKeyInput.value.trim();
+
+            // UI hazırlığı
             progressBox.classList.remove('hidden');
             resultsContainer.classList.add('hidden');
             findingsList.innerHTML = '';
+            document.getElementById('statDiscovered').innerText = '0';
+            document.getElementById('statCrawled').innerText = '0';
+            document.getElementById('statAnalyzed').innerText = '0';
+            document.getElementById('statErrors').innerText = '0';
 
-            updateProgress(20, "🤖 Bot Görevlendiriliyor ve Siteye Bağlanılıyor...");
+            updateProgress(10, '🤖 Bot görevlendiriliyor...');
 
-            // Çoklu Proxy / Bot Ağ Geçidi (CORS ve Anti-Bot engellerini aşmak için)
-            const proxyGateways = [
-                `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
-                `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
-            ];
-
-            let rawHtml = "";
+            // Proxy listesini oluştur
+            const proxies = buildProxyList(targetUrl, apiKey);
+            let rawHtml = '';
             let isFetched = false;
+            let lastError = '';
 
-            for (let gateway of proxyGateways) {
+            // Sırayla proxy'leri dene
+            for (let i = 0; i < proxies.length; i++) {
+                const proxy = proxies[i];
+                const msg = `🌐 Proxy ${i + 1}/${proxies.length} deneniyor: ${proxy.url.split('?')[0].replace(/^https?:\/\//, '').slice(0, 30)}...`;
+                updateProgress(10 + Math.floor((i / proxies.length) * 30), msg);
+
                 try {
-                    const response = await fetch(gateway);
-                    if (response.ok) {
-                        const data = await response.json().catch(() => null);
-                        rawHtml = data && data.contents ? data.contents : await response.text();
-                        if (rawHtml && rawHtml.length > 200) {
-                            isFetched = true;
-                            break;
-                        }
-                    }
+                    rawHtml = await fetchViaProxy(proxy);
+                    isFetched = true;
+                    break; // Başarılı, döngüden çık
                 } catch (err) {
-                    console.warn("Ağ geçidi deneniyor...", err);
+                    lastError = err.message || 'Bilinmeyen hata';
+                    console.warn(`Proxy ${i + 1} başarısız:`, err.message);
+                    continue; // sonraki proxy'ye geç
                 }
             }
 
             if (!isFetched) {
-                alert("Hedef siteye erişilemedi veya bot engeline takıldı. Lütfen adresi kontrol ediniz.");
+                // Tüm proxy'ler başarısız
+                alert(
+                    `❌ Hedef siteye tüm proxy'lerle erişilemedi.\n` +
+                    `Son hata: ${lastError}\n\n` +
+                    `💡 Öneriler:\n` +
+                    `• URL'yi kontrol edin (geçerli ve erişilebilir olmalı)\n` +
+                    `• Scraper API anahtarı girmeyi deneyin (ücretsiz ScrapingAnt)\n` +
+                    `• Site Cloudflare veya benzeri koruma kullanıyor olabilir.`
+                );
                 progressBox.classList.add('hidden');
                 return;
             }
 
-            updateProgress(50, "📄 DOM Haritası Çıkarılıyor & İçerikler Ayrıştırılıyor...");
+            // Başarılı oldu, içeriği işle
+            updateProgress(50, '📄 DOM haritası çıkarılıyor & içerikler ayrıştırılıyor...');
 
             const parser = new DOMParser();
             const doc = parser.parseFromString(rawHtml, 'text/html');
 
-            // 1. Canlı ve Gerçek Alt Linkleri (Haber Bağlantılarını) Topla
+            // Alt linkleri topla
             const links = Array.from(doc.querySelectorAll('a[href]'));
             const extractedArticles = [];
-
             links.forEach(a => {
                 const text = a.innerText.trim();
                 const href = a.getAttribute('href');
-
                 if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
                     try {
                         const absoluteUrl = new URL(href, targetUrl).href;
                         if (text.length > 15) {
                             extractedArticles.push({ title: text, url: absoluteUrl });
                         }
-                    } catch (e) {}
+                    } catch (e) { /* geçersiz URL */ }
                 }
             });
 
-            // Benzersiz Bağlantıları Süz
-            const uniqueArticles = Array.from(new Set(extractedArticles.map(a => a.url)))
-                .map(url => extractedArticles.find(a => a.url === url));
+            // Benzersiz URL'ler
+            const uniqueMap = new Map();
+            extractedArticles.forEach(art => {
+                if (!uniqueMap.has(art.url)) {
+                    uniqueMap.set(art.url, art);
+                }
+            });
+            const uniqueArticles = Array.from(uniqueMap.values());
 
             document.getElementById('statDiscovered').innerText = uniqueArticles.length;
-            document.getElementById('statCrawled').innerText = "1 Sayfa";
+            document.getElementById('statCrawled').innerText = '1 Sayfa';
 
-            updateProgress(80, "🔍 Kelime ve Gramer Analiz Motoru Çalışıyor...");
+            updateProgress(80, '🔍 Kelime ve gramer analiz motoru çalışıyor...');
 
-            // Gereksiz Elemanları Temizle
+            // Gereksiz elemanları temizle
             doc.querySelectorAll('script, style, noscript, svg, header, footer').forEach(el => el.remove());
-            const textContent = doc.body ? doc.body.innerText : "";
+            const textContent = doc.body ? doc.body.innerText : '';
             const wordList = textContent.split(/\s+/).filter(w => w.length > 0);
+            document.getElementById('statAnalyzed').innerText = wordList.length + ' Kelime';
 
-            document.getElementById('statAnalyzed').innerText = wordList.length + " Kelime";
-
-            // 2. İmla ve Dil Bilgisi İhlallerini Bul
+            // İmla hatalarını bul
             const detectedErrors = [];
             SPELL_RULES_TR.forEach(rule => {
                 const matches = textContent.match(rule.pattern);
@@ -199,18 +334,24 @@
             });
 
             document.getElementById('statErrors').innerText = detectedErrors.length;
-            updateProgress(100, "✅ Tarama Tamamlandı!");
+            updateProgress(100, '✅ Tarama tamamlandı!');
 
-            // Sonuçları Ekrana Bas
+            // Sonuçları göster
             renderResults(targetUrl, detectedErrors, uniqueArticles);
         });
 
+        // --------------------------------------------------------------
+        // 8. PROGRESS GÜNCELLEME
+        // --------------------------------------------------------------
         function updateProgress(percent, text) {
             progressBar.style.width = percent + '%';
             progressPercent.innerText = percent + '%';
             statusText.innerText = text;
         }
 
+        // --------------------------------------------------------------
+        // 9. SONUÇLARI RENDER ET
+        // --------------------------------------------------------------
         function renderResults(mainUrl, errors, articles) {
             resultsContainer.classList.remove('hidden');
             let html = '';
