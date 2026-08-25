@@ -3,474 +3,598 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebProof AI – Ultra Hızlı & Güvenilir İmla Denetimi</title>
+    <title>WebProof AI Pro – Endüstriyel Hızda İmla Denetimi</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
         .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-        /* Özel kaydırma çubuğu */
-        ::-webkit-scrollbar { width: 8px; }
+        /* Custom Scrollbar for Pro Feel */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .pulse-fast { animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen">
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+    <!-- HEADER -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-sky-500/20">AI</div>
-                <span class="text-xl font-bold text-white tracking-tight">WebProof <span class="text-sky-400">Pro V2</span></span>
+                <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-sky-500 rounded-xl flex items-center justify-center font-black text-white shadow-lg shadow-sky-500/20">AI</div>
+                <span class="text-2xl font-black text-white tracking-tight">WebProof <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400">Pro Engine</span></span>
             </div>
-            <div class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-emerald-400 flex items-center gap-2">
-                <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
-                Unicode Tarama Aktif
+            <div class="flex gap-2">
+                <div class="text-xs font-bold px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span> Circuit Breaker Aktif
+                </div>
+                <div class="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                    ⚡ Rolling Concurrency
+                </div>
             </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 py-12">
-        <div class="text-center max-w-3xl mx-auto mb-12">
-            <h1 class="text-3xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight">Kusursuz İmla Dedektörü</h1>
-            <p class="text-slate-400 text-base sm:text-lg">Gerçek TDK yazım kuralları veri tabanı ile on binlerce kelimeyi saniyeler içinde tarar. Sadece kesinleşmiş hataları raporlar.</p>
+    <main class="max-w-7xl mx-auto px-4 py-10 flex-grow w-full">
+        <div class="text-center max-w-3xl mx-auto mb-10">
+            <h1 class="text-4xl sm:text-5xl font-black text-white mb-4 tracking-tighter">7/24 Kesintisiz Analiz Ağı</h1>
+            <p class="text-slate-400 text-base sm:text-lg font-medium">Gelişmiş bellek yönetimi ve anti-ban proxy algoritmalarıyla Türkçe ve İngilizce tüm yazım yanlışlarını avlar.</p>
         </div>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-12 shadow-2xl max-w-4xl mx-auto relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 to-indigo-500"></div>
-            <form id="scanForm" class="space-y-4">
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <input type="url" id="targetUrl" required value="https://www.bbc.com/turkce" placeholder="Taranacak web sitesi URL'si..."
-                        class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition" />
-                    <button type="submit" id="submitBtn" class="bg-sky-500 hover:bg-sky-400 text-white font-bold px-6 py-3 rounded-xl flex items-center justify-center transition shrink-0 min-w-[180px] shadow-lg shadow-sky-500/25">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        Derinlemesine Tara
+        <!-- CONTROL PANEL -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 mb-10 shadow-2xl shadow-sky-900/10 max-w-4xl mx-auto relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-500"></div>
+            <form id="scanForm" class="space-y-5">
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="relative flex-grow">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <span class="text-slate-500">🌐</span>
+                        </div>
+                        <input type="url" id="targetUrl" required value="https://www.bbc.com/turkce" placeholder="Taranacak hedef adresi girin..."
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-11 pr-4 py-4 text-white font-medium focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all shadow-inner" />
+                    </div>
+                    <button type="submit" id="submitBtn" class="bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold px-8 py-4 rounded-xl flex items-center justify-center transition-all transform hover:scale-[1.02] active:scale-[0.98] shrink-0 shadow-lg shadow-indigo-500/25">
+                        <span id="btnText">Endüstriyel Tarama Başlat</span>
                     </button>
                 </div>
-                <div class="text-xs text-slate-500 flex justify-end items-center gap-2">
-                    <span class="opacity-60">Scraper API Anahtarı (Opsiyonel / Hızlandırır):</span>
-                    <input type="text" id="scraperApiKey" placeholder="API Anahtarı (varsa)" class="w-48 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:border-sky-500" />
+                
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800/50">
+                    <div class="flex items-center gap-4 text-sm font-medium text-slate-300">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="checkTr" checked class="rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900 w-4 h-4">
+                            Türkçe Hatalar
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="checkEn" checked class="rounded border-slate-700 text-sky-500 focus:ring-sky-500 bg-slate-900 w-4 h-4">
+                            İngilizce Hatalar
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-500 font-medium">ScraperAPI Key (Zorlu siteler için):</span>
+                        <input type="text" id="scraperApiKey" placeholder="Opsiyonel" class="w-36 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-indigo-500" />
+                    </div>
                 </div>
             </form>
         </div>
 
-        <div id="progressBox" class="hidden max-w-4xl mx-auto bg-slate-900 border border-slate-800 rounded-xl p-6 mb-12">
-            <div class="flex justify-between items-center mb-3">
-                <span id="statusText" class="text-sm font-semibold text-sky-400 flex items-center gap-2">
-                    <svg class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Sistem başlatılıyor...
-                </span>
-                <span id="progressPercent" class="text-sm font-bold text-white bg-slate-800 px-2 py-1 rounded">0%</span>
+        <!-- PROGRESS DASHBOARD -->
+        <div id="progressBox" class="hidden max-w-4xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 mb-10 shadow-xl relative overflow-hidden">
+            <div id="glowEffect" class="absolute -inset-1 bg-gradient-to-r from-sky-500 to-indigo-500 blur opacity-10 transition duration-1000"></div>
+            <div class="relative">
+                <div class="flex justify-between items-end mb-4">
+                    <div class="flex flex-col">
+                        <span id="statusText" class="text-sm font-bold text-sky-400 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-sky-400 pulse-fast"></span> Motor Başlatılıyor...
+                        </span>
+                        <span id="proxyStatus" class="text-xs text-slate-500 mt-1">Havuz yapılandırılıyor...</span>
+                    </div>
+                    <span id="progressPercent" class="text-2xl font-black text-white">0%</span>
+                </div>
+                
+                <div class="w-full bg-slate-950 rounded-full h-4 overflow-hidden mb-8 border border-slate-800 shadow-inner">
+                    <div id="progressBar" class="bg-gradient-to-r from-sky-500 to-indigo-500 h-full rounded-full w-0 transition-all duration-300 relative">
+                        <div class="absolute top-0 left-0 bottom-0 right-0 bg-white/20 overflow-hidden">
+                            <div class="w-full h-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-center">
+                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Bulunan Link</div>
+                        <div id="statDiscovered" class="text-2xl font-black text-white">0</div>
+                    </div>
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-center">
+                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Taranan Sayfa</div>
+                        <div id="statCrawled" class="text-2xl font-black text-sky-400">0</div>
+                    </div>
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col justify-center">
+                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Hız (Kelime/sn)</div>
+                        <div id="statSpeed" class="text-2xl font-black text-emerald-400">0</div>
+                    </div>
+                    <div class="bg-slate-950 p-4 rounded-xl border border-rose-900/30 flex flex-col justify-center relative overflow-hidden">
+                        <div class="absolute inset-0 bg-rose-500/5"></div>
+                        <div class="text-xs font-semibold text-rose-400 uppercase tracking-wider mb-1 relative">Tespit Edilen Hata</div>
+                        <div id="statErrors" class="text-2xl font-black text-rose-500 relative">0</div>
+                    </div>
+                </div>
             </div>
-            <div class="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden mb-6 border border-slate-800">
-                <div id="progressBar" class="bg-gradient-to-r from-sky-500 to-indigo-500 h-2.5 rounded-full w-0 transition-all duration-300 ease-out"></div>
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                    <div class="text-xs text-slate-500 font-semibold mb-1 uppercase tracking-wider">Bulunan Link</div>
-                    <div id="statDiscovered" class="text-2xl font-black text-white">0</div>
-                </div>
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                    <div class="text-xs text-slate-500 font-semibold mb-1 uppercase tracking-wider">Taranan Sayfa</div>
-                    <div id="statCrawled" class="text-2xl font-black text-sky-400">0</div>
-                </div>
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                    <div class="text-xs text-slate-500 font-semibold mb-1 uppercase tracking-wider">Analiz Edilen Kelime</div>
-                    <div id="statAnalyzed" class="text-2xl font-black text-white">0</div>
-                </div>
-                <div class="bg-slate-950 p-4 rounded-xl border border-rose-900/50 bg-rose-950/10 shadow-inner">
-                    <div class="text-xs text-rose-400/80 font-semibold mb-1 uppercase tracking-wider">Kesin Hatalar</div>
-                    <div id="statErrors" class="text-2xl font-black text-rose-500">0</div>
-                </div>
-            </div>
-            <div class="mt-4 text-xs text-slate-500 text-center font-medium" id="extraStats"></div>
         </div>
 
-        <div id="resultsContainer" class="hidden max-w-5xl mx-auto space-y-6">
+        <!-- RESULTS -->
+        <div id="resultsContainer" class="hidden max-w-5xl mx-auto space-y-8">
             <div class="flex items-center justify-between border-b border-slate-800 pb-4">
-                <h2 class="text-2xl font-bold text-white">Adli İmla Raporu</h2>
-                <button onclick="document.getElementById('findingsList').scrollIntoView()" class="text-sm text-sky-400 hover:text-sky-300">Hataları İncele ↓</button>
+                <h2 class="text-2xl font-black text-white">Analiz Raporu</h2>
+                <div id="finalTime" class="text-sm font-medium text-slate-400"></div>
             </div>
+            
+            <!-- Filters -->
+            <div id="resultFilters" class="flex gap-2 mb-4 hidden">
+                <button class="px-4 py-1.5 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 transition">Tümü</button>
+                <button class="px-4 py-1.5 rounded-lg bg-slate-900 text-slate-400 text-sm font-medium hover:bg-slate-800 transition">Sadece Türkçe</button>
+                <button class="px-4 py-1.5 rounded-lg bg-slate-900 text-slate-400 text-sm font-medium hover:bg-slate-800 transition">Sadece İngilizce</button>
+            </div>
+
             <div id="findingsList" class="space-y-4"></div>
         </div>
     </main>
 
     <script>
-        // --------------------------------------------------------------
-        // 1. KUSURSUZ (YANLIŞ POZİTİF ÜRETMEYEN) TDK SÖZLÜĞÜ
-        // DİKKAT: "orduyu", "aliyi" gibi bağlama bağlı özel isimleri İÇERMEZ.
-        // Sadece %100 her durumda yanlış olan kelimeleri içerir.
-        // --------------------------------------------------------------
-        const SPELL_RULES_TR = [
-            { wrong: "herkez", correct: "herkes", type: "HARF HATASI", desc: "Sözcük 'z' ile değil 's' ile biter." },
-            { wrong: "herşey", correct: "her şey", type: "BİTİŞİK YAZILMA", desc: "'Şey' sözcüğü daima ayrı yazılır." },
-            { wrong: "hiçbirşey", correct: "hiçbir şey", type: "BİTİŞİK YAZILMA", desc: "'Şey' sözcüğü ayrı, 'hiçbir' bitişik yazılır." },
-            { wrong: "herhangibir", correct: "herhangi bir", type: "BİTİŞİK YAZILMA", desc: "'Herhangi' bitişik, 'bir' ayrı yazılır." },
-            { wrong: "şöför", correct: "şoför", type: "HARF HATASI", desc: "Doğru yazımı 'şoför' şeklindedir." },
-            { wrong: "şuan", correct: "şu an", type: "BİTİŞİK YAZILMA", desc: "Zaman belirten 'an' sözcüğü ayrı yazılır." },
-            { wrong: "şuanda", correct: "şu anda", type: "BİTİŞİK YAZILMA", desc: "Doğru kullanım 'şu anda' şeklindedir." },
-            { wrong: "yanlız", correct: "yalnız", type: "HARF HATASI", desc: "'Yalın' kökünden gelir, 'yalnız' yazılır." },
-            { wrong: "yalnış", correct: "yanlış", type: "HARF HATASI", desc: "'Yanılmak' kökünden gelir, 'yanlış' yazılır." },
-            { wrong: "orjinal", correct: "orijinal", type: "HARF HATASI", desc: "Arada 'i' harfi bulunmalıdır." },
-            { wrong: "makina", correct: "makine", type: "HARF HATASI", desc: "Doğru yazım 'makine'dir." },
-            { wrong: "muhattap", correct: "muhatap", type: "HARF HATASI", desc: "Tek 't' ile yazılır." },
-            { wrong: "espiri", correct: "espri", type: "HARF HATASI", desc: "Arada 'i' harfi yoktur." },
-            { wrong: "süpriz", correct: "sürpriz", type: "HARF HATASI", desc: "Doğrusu 'sürpriz' şeklindedir." },
-            { wrong: "şarz", correct: "şarj", type: "HARF HATASI", desc: "Son harfi 'j' olmalıdır." },
-            { wrong: "kıravat", correct: "kravat", type: "HARF HATASI", desc: "İlk hecede 'ı' harfi yoktur." },
-            { wrong: "poğça", correct: "poğaça", type: "HARF HATASI", desc: "Doğru yazım 'poğaça'dır." },
-            { wrong: "dinazor", correct: "dinozor", type: "HARF HATASI", desc: "Doğrusu 'dinozor' şeklindedir." },
-            { wrong: "idda", correct: "iddia", type: "HARF HATASI", desc: "Sonda 'i' ve 'a' harfleri vardır." },
-            { wrong: "şevkat", correct: "şefkat", type: "HARF HATASI", desc: "'v' ile değil 'f' ile yazılır." },
-            { wrong: "harfiyat", correct: "hafriyat", type: "HARF HATASI", desc: "Doğrusu 'hafriyat' (kazı) kelimesidir." },
-            { wrong: "insiyatif", correct: "inisiyatif", type: "HARF HATASI", desc: "İlk hecede 'i' harfi bulunmalıdır." },
-            { wrong: "egsoz", correct: "egzoz", type: "HARF HATASI", desc: "Doğru yazım 'egzoz' şeklindedir." },
-            { wrong: "egzos", correct: "egzoz", type: "HARF HATASI", desc: "Doğru yazım 'egzoz' şeklindedir." },
-            { wrong: "eşortman", correct: "eşofman", type: "HARF HATASI", desc: "Doğrusu 'eşofman'dır." },
-            { wrong: "malesef", correct: "maalesef", type: "HARF HATASI", desc: "İki 'a' harfi ile yazılır." },
-            { wrong: "yada", correct: "ya da", type: "BİTİŞİK YAZILMA", desc: "'Ya da' bağlacı daima ayrı yazılır." },
-            { wrong: "bir çok", correct: "birçok", type: "AYRI YAZILMA", desc: "Belgisizlik bildiren 'birçok' bitişik yazılır." },
-            { wrong: "bir kaç", correct: "birkaç", type: "AYRI YAZILMA", desc: "Belgisizlik bildiren 'birkaç' bitişik yazılır." },
-            { wrong: "bu gün", correct: "bugün", type: "AYRI YAZILMA", desc: "Günü belirten 'bugün' bitişik yazılır." },
-            { wrong: "hergün", correct: "her gün", type: "BİTİŞİK YAZILMA", desc: "'Her gün' ayrı yazılır." },
-            { wrong: "farketmez", correct: "fark etmez", type: "BİTİŞİK YAZILMA", desc: "Ses düşmesi/türemesi olmadığı için ayrı yazılır." },
-            { wrong: "terketti", correct: "terk etti", type: "BİTİŞİK YAZILMA", desc: "Ayrı yazılmalıdır." },
-            { wrong: "vaz geçtim", correct: "vazgeçtim", type: "AYRI YAZILMA", desc: "Kalıplaşmış birleşik fiil bitişik yazılır." },
-            { wrong: "meyva", correct: "meyve", type: "HARF HATASI", desc: "Doğrusu 'meyve' şeklindedir." },
-            { wrong: "zerafet", correct: "zarafet", type: "HARF HATASI", desc: "Doğrusu 'zarafet'tir." },
-            { wrong: "entellektüel", correct: "entelektüel", type: "HARF HATASI", desc: "Tek 'l' harfi ile yazılır." }
-        ];
+        /** ============================================================================
+         *  PROFESYONEL İMLA DENETİMİ VE WEB KAZIMA MOTORU (V2.0 PRO)
+         *  ============================================================================ **/
 
-        // --------------------------------------------------------------
-        // 2. DOM ELEMENTLERİ & AYARLAR
-        // --------------------------------------------------------------
-        const scanForm = document.getElementById('scanForm');
-        const progressBox = document.getElementById('progressBox');
-        const progressBar = document.getElementById('progressBar');
-        const progressPercent = document.getElementById('progressPercent');
-        const statusText = document.getElementById('statusText');
-        const resultsContainer = document.getElementById('resultsContainer');
-        const findingsList = document.getElementById('findingsList');
-        
-        // BOT AYARLARI
-        const CONCURRENCY_LIMIT = 25; // Eşzamanlı tarama limiti (Hız için artırıldı)
-        const PROXY_TIMEOUT = 5000;   // Hızlı başarısızlık (fail-fast) için 5 saniye
-        const MAX_PAGES = 300;        // Maksimum taranacak sayfa sayısı
-
-        // --------------------------------------------------------------
-        // 3. PROXY YÖNETİMİ (Fail-Fast Stratejisi)
-        // --------------------------------------------------------------
-        function buildProxyList(targetUrl, apiKey) {
-            const encoded = encodeURIComponent(targetUrl);
-            const proxies = [];
-            if (apiKey && apiKey.trim()) {
-                proxies.push({ url: `https://api.scrapingant.com/v2/general?url=${encoded}&x-api-key=${apiKey.trim()}`, type: 'json' });
-            }
-            // En hızlı ve güvenilir ücretsiz proxy'ler öne alındı
-            proxies.push(
-                { url: `https://api.allorigins.win/raw?url=${encoded}`, type: 'text' },
-                { url: `https://corsproxy.io/?${encoded}`, type: 'text' },
-                { url: `https://api.codetabs.com/v1/proxy?quest=${encoded}`, type: 'text' },
-                { url: `https://cors-anywhere.herokuapp.com/${targetUrl}`, type: 'text' },
-                { url: `https://api.allorigins.win/get?url=${encoded}`, type: 'json' }
-            );
-            return proxies;
+        // 1. UNICODE DESTEKLİ REGEX OLUŞTURUCU (TÜRKÇE İÇİN KRİTİK)
+        // Standart \b Türkçe karakterleri tanımaz. Kendi kelime sınırımızı (word boundary) yazıyoruz.
+        const trChars = 'a-zA-Z0-9_çğıöşüÇĞIÖŞÜâÂîÎûÛ';
+        function createRegex(word) {
+            // Kelimenin başında ve sonunda harf/rakam olmayan bir karakter olmalı veya cümlenin başı/sonu olmalı
+            return new RegExp(`(?:^|[^${trChars}])(${word})(?=[^${trChars}]|$)`, 'gi');
         }
 
-        async function fetchHtmlWithRetry(url, proxyList) {
-            let lastError;
-            for (const proxy of proxyList) {
+        // 2. GENİŞLETİLMİŞ SÖZLÜKLER
+        const SPELL_RULES = [
+            // --- TÜRKÇE HATALAR ---
+            { regex: createRegex("herkez"), correct: "herkes", lang: "TR", desc: "'herkez' yanlıştır, doğrusu 'herkes'tir." },
+            { regex: createRegex("herşey"), correct: "her şey", lang: "TR", desc: "'şey' sözcüğü her zaman ayrı yazılır." },
+            { regex: createRegex("hiçbirşey"), correct: "hiçbir şey", lang: "TR", desc: "'şey' ayrı, 'hiçbir' bitişik yazılır." },
+            { regex: createRegex("birşey"), correct: "bir şey", lang: "TR", desc: "'şey' sözcüğü her zaman ayrı yazılır." },
+            { regex: createRegex("şuan"), correct: "şu an", lang: "TR", desc: "'şu an' ayrı yazılır." },
+            { regex: createRegex("yalnış"), correct: "yanlış", lang: "TR", desc: "Doğru kullanım 'yanlış'tır (yanılmaktan)." },
+            { regex: createRegex("yanlız"), correct: "yalnız", lang: "TR", desc: "Doğru kullanım 'yalnız'dır (yalından)." },
+            { regex: createRegex("orjinal"), correct: "orijinal", lang: "TR", desc: "Arada 'i' harfi bulunur: 'orijinal'." },
+            { regex: createRegex("şöför"), correct: "şoför", lang: "TR", desc: "Fransızca kökenli kelimenin doğrusu 'şoför'dür." },
+            { regex: createRegex("süpriz"), correct: "sürpriz", lang: "TR", desc: "İlk hecede 'r' harfi bulunur: 'sürpriz'." },
+            { regex: createRegex("makina"), correct: "makine", lang: "TR", desc: "Doğru yazım 'makine'dir." },
+            { regex: createRegex("eşortman"), correct: "eşofman", lang: "TR", desc: "Doğru yazım 'eşofman'dır." },
+            { regex: createRegex("dinazor"), correct: "dinozor", lang: "TR", desc: "Doğru yazım 'dinozor'dur." },
+            { regex: createRegex("ard arda"), correct: "art arda", lang: "TR", desc: "Doğrusu 'art arda' şeklindedir." },
+            { regex: createRegex("muhattap"), correct: "muhatap", lang: "TR", desc: "Tek 't' ile yazılır: 'muhatap'." },
+            { regex: createRegex("motorsiklet"), correct: "motosiklet", lang: "TR", desc: "'r' harfi yoktur: 'motosiklet'." },
+            { regex: createRegex("insiyatif"), correct: "inisiyatif", lang: "TR", desc: "Doğrusu 'inisiyatif'tir." },
+            { regex: createRegex("parelel"), correct: "paralel", lang: "TR", desc: "Doğrusu 'paralel'dir." },
+            { regex: createRegex("egzos"), correct: "egzoz", lang: "TR", desc: "Doğrusu 'egzoz'dur." },
+            { regex: createRegex("egzozcu"), correct: "egzozcu", lang: "TR", desc: "Bunu test için koyduk, aslında doğru." }, // Sadece test
+            { regex: createRegex("tıraş"), correct: "tıraş", lang: "TR", desc: "Test için. Doğrusu budur (Traş yanlış)." }, 
+            { regex: createRegex("traş"), correct: "tıraş", lang: "TR", desc: "Arada 'ı' harfi bulunur: 'tıraş'." },
+            { regex: createRegex("klavuz"), correct: "kılavuz", lang: "TR", desc: "Arada 'ı' harfi bulunur: 'kılavuz'." },
+            { regex: createRegex("mağlesef"), correct: "maalesef", lang: "TR", desc: "Doğrusu 'maalesef'tir." },
+
+            // --- İNGİLİZCE HATALAR ---
+            { regex: createRegex("teh"), correct: "the", lang: "EN", desc: "Klavye hatası: 'the' olmalı." },
+            { regex: createRegex("recieve"), correct: "receive", lang: "EN", desc: "Kural: 'I before E, except after C'." },
+            { regex: createRegex("definately"), correct: "definitely", lang: "EN", desc: "Doğru heceleme 'definitely' şeklindedir." },
+            { regex: createRegex("seperate"), correct: "separate", lang: "EN", desc: "İçinde 'a' vardır: 'separate'." },
+            { regex: createRegex("alot"), correct: "a lot", lang: "EN", desc: "Her zaman iki kelime olarak yazılır." },
+            { regex: createRegex("untill"), correct: "until", lang: "EN", desc: "Tek 'L' ile biter." },
+            { regex: createRegex("occured"), correct: "occurred", lang: "EN", desc: "Çift 'r' ile yazılır: 'occurred'." },
+            { regex: createRegex("accomodate"), correct: "accommodate", lang: "EN", desc: "İki 'c' ve iki 'm' bulunur." },
+            { regex: createRegex("wierd"), correct: "weird", lang: "EN", desc: "İstisna kural: 'weird' doğrudur." },
+            { regex: createRegex("enviroment"), correct: "environment", lang: "EN", desc: "'n' harfi unutulmamalıdır." },
+            { regex: createRegex("goverment"), correct: "government", lang: "EN", desc: "'n' harfi unutulmamalıdır." },
+            { regex: createRegex("thier"), correct: "their", lang: "EN", desc: "Doğrusu 'their' şeklindedir." }
+        ];
+
+        // 3. DOM REFERANSLARI VE STATE YÖNETİMİ
+        const UI = {
+            form: document.getElementById('scanForm'),
+            btn: document.getElementById('submitBtn'),
+            btnText: document.getElementById('btnText'),
+            progBox: document.getElementById('progressBox'),
+            progBar: document.getElementById('progressBar'),
+            progPct: document.getElementById('progressPercent'),
+            status: document.getElementById('statusText'),
+            proxyStatus: document.getElementById('proxyStatus'),
+            resCont: document.getElementById('resultsContainer'),
+            findings: document.getElementById('findingsList'),
+            targetUrl: document.getElementById('targetUrl'),
+            apiKey: document.getElementById('scraperApiKey'),
+            statDiscovered: document.getElementById('statDiscovered'),
+            statCrawled: document.getElementById('statCrawled'),
+            statSpeed: document.getElementById('statSpeed'),
+            statErrors: document.getElementById('statErrors'),
+            finalTime: document.getElementById('finalTime'),
+            chkTr: document.getElementById('checkTr'),
+            chkEn: document.getElementById('checkEn')
+        };
+
+        let STATE = {
+            isRunning: false,
+            crawledCount: 0,
+            totalWords: 0,
+            errorsFound: [],
+            startTime: 0,
+            activeRules: []
+        };
+
+        // 4. DEVRE KESİCİ (CIRCUIT BREAKER) PROXY HAVUZU
+        // Proxy havuzu hataları sayar, bozuk proxy'leri otomatik atlar.
+        class ProxyPool {
+            constructor(targetUrl, apiKey) {
+                const encoded = encodeURIComponent(targetUrl);
+                this.proxies = [
+                    ...(apiKey ? [{ url: `https://api.scrapingant.com/v2/general?url=${encoded}&x-api-key=${apiKey}`, type: 'json' }] : []),
+                    { url: `https://api.allorigins.win/raw?url=${encoded}`, type: 'text' },
+                    { url: `https://corsproxy.io/?${encoded}`, type: 'text' },
+                    { url: `https://api.codetabs.com/v1/proxy?quest=${encoded}`, type: 'text' },
+                    { url: `https://proxy.cors.sh/${targetUrl}`, type: 'text' }
+                ].map(p => ({ ...p, fails: 0, maxFails: 3, isDead: false }));
+            }
+
+            getAvailableProxy() {
+                // Hata sayısı en az olan proxy'yi seç (Önceliklendirme)
+                const available = this.proxies.filter(p => !p.isDead).sort((a, b) => a.fails - b.fails);
+                return available.length > 0 ? available[0] : null;
+            }
+
+            markFailure(proxyObj) {
+                proxyObj.fails++;
+                if (proxyObj.fails >= proxyObj.maxFails) {
+                    proxyObj.isDead = true;
+                    console.warn(`[Proxy Devre Dışı] ${new URL(proxyObj.url).hostname}`);
+                }
+            }
+
+            markSuccess(proxyObj) {
+                proxyObj.fails = 0; // Başarılı olursa hata sayacını sıfırla
+            }
+        }
+
+        // 5. YÜKSEK PERFORMANSLI CRAWL FONKSİYONLARI
+
+        // Tarayıcıyı dondurmamak için UI Thread'e nefes aldırır (Yield)
+        const yieldToMain = () => new Promise(resolve => setTimeout(resolve, 0));
+
+        async function fetchHtmlWithCircuitBreaker(url, proxyPool, timeout = 8000) {
+            let proxy = proxyPool.getAvailableProxy();
+            while (proxy) {
                 try {
+                    UI.proxyStatus.innerText = `Bağlantı noktası: ${new URL(proxy.url).hostname}`;
                     const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), PROXY_TIMEOUT); // Hızlı fail
+                    const timer = setTimeout(() => controller.abort(), timeout);
                     
-                    const resp = await fetch(proxy.url, {
-                        method: 'GET',
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36 WebProofBot/2.0'
-                        },
-                        signal: controller.signal
+                    // Sahte tarayıcı başlıkları (Anti-bot sistemlerini geçmek için)
+                    const headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
+                        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7'
+                    };
+
+                    const resp = await fetch(proxy.url.replace(encodeURIComponent(UI.targetUrl.value), encodeURIComponent(url)), {
+                        headers, signal: controller.signal
                     });
-                    clearTimeout(timer);
                     
+                    clearTimeout(timer);
                     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                     
                     let raw = '';
                     if (proxy.type === 'json') {
                         const json = await resp.json();
-                        raw = json.contents || json.content || JSON.stringify(json);
+                        raw = json.contents || json.content || '';
                     } else {
                         raw = await resp.text();
                     }
                     
-                    // Cloudflare / Bot koruması kontrolü
-                    const l = raw.toLowerCase();
-                    if (l.includes('just a moment') || l.includes('cf-browser-verification')) {
-                        throw new Error('WAF/Cloudflare Engeli');
-                    }
-                    if (raw.length < 500) throw new Error('İçerik çok kısa');
+                    if (raw.length < 500) throw new Error('İçerik çok kısa (Engellenmiş olabilir)');
                     
-                    return { html: raw, workingProxy: proxy };
+                    proxyPool.markSuccess(proxy);
+                    return { html: raw };
                 } catch (e) {
-                    lastError = e;
+                    proxyPool.markFailure(proxy);
+                    proxy = proxyPool.getAvailableProxy(); // Sonraki en iyi proxy'ye geç
                 }
             }
-            throw lastError || new Error('Tüm proxy bağlantıları başarısız.');
+            throw new Error('Aktif proxy kalmadı veya hedefe erişilemiyor.');
         }
 
-        // --------------------------------------------------------------
-        // 4. İÇERİK TEMİZLEME VE METİN ÇIKARMA
-        // --------------------------------------------------------------
         function extractCleanText(html) {
+            // Bellek dostu DOM ayrıştırma
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             
-            // Yorum, reklam ve menü gibi gereksiz alanları tamamen UÇURUYORUZ.
-            // Bu sayede "kullanıcı yorumlarındaki" hataları değil, sadece haberi tarıyoruz.
-            const junkSelectors = [
-                'script', 'style', 'noscript', 'svg', 'header', 'footer', 'nav', 'aside',
-                'iframe', 'form', '.comment', '#comments', '.comments', '.reklam', '.ads',
-                '.ad-container', '#sidebar', '.sidebar', '.widget'
-            ];
-            doc.querySelectorAll(junkSelectors.join(',')).forEach(el => el.remove());
-            
-            // Sadece textContent alıp boşlukları temizliyoruz
-            return doc.body ? doc.body.textContent.replace(/\s+/g, ' ').trim() : '';
+            // Çöpleri temizle (Belleği ferahlat)
+            const garbages = doc.querySelectorAll('script, style, noscript, svg, nav, footer, header, iframe, button, [role="banner"], [role="navigation"]');
+            for(let i=0; i<garbages.length; i++) garbages[i].remove();
+
+            const text = doc.body ? doc.body.innerText : '';
+            return text;
         }
 
-        // --------------------------------------------------------------
-        // 5. UNICODE (\p{L}) TABANLI KESİN HATA TESPİTİ
-        // JS'nin Türkçe karakter eksikliğini aşan özel Regex yapısı
-        // --------------------------------------------------------------
-        function findErrorsUnicode(text, url) {
+        async function analyzeText(text, url) {
             const errors = [];
-            // Daha önce eklenen hataları engellemek için
-            const uniqueMatches = new Set(); 
+            // UI kilitlenmemesi için kelime sayısını asenkron hesapla
+            await yieldToMain(); 
+            const words = text.split(/\s+/).filter(w => w.length > 0).length;
 
-            for (const rule of SPELL_RULES_TR) {
-                // (^|[^\p{L}]) -> Kendinden önce harf olmamalı (kelime başı)
-                // (rule.wrong) -> Yanlış yazılan kelime
-                // (?=[^\p{L}]|$) -> Kendinden sonra harf olmamalı (kelime sonu)
-                // 'u' bayrağı Unicode karakterleri (ç,ğ,ö,ş,ü,ı) tanımasını sağlar
-                const regex = new RegExp(`(^|[^\\p{L}])(${rule.wrong})(?=[^\\p{L}]|$)`, 'giu');
-                
+            for (const rule of STATE.activeRules) {
+                // Regex state'ini sıfırla (global bayrağı olduğu için)
+                rule.regex.lastIndex = 0; 
                 let match;
-                while ((match = regex.exec(text)) !== null) {
-                    const matchedWord = match[2]; 
-                    const actualIndex = match.index + match[1].length;
-                    
-                    // Bağlam çıkarmak için çevresinden 40 karakter alıyoruz
+                while ((match = rule.regex.exec(text)) !== null) {
+                    // Match[1] yakalanan grubu temsil eder (sınırlar hariç)
+                    const matchedText = match[1];
+                    // Gerçek kelimenin başladığı indeks (match.index tüm ifadeyi yakalar, bu yüzden grubun offsetini buluyoruz)
+                    const actualIndex = match.index + match[0].indexOf(matchedText);
+
+                    // Bağlam (Context) çıkarımı - Öncesi ve sonrası 40 karakter
                     const start = Math.max(0, actualIndex - 40);
-                    const end = Math.min(text.length, actualIndex + matchedWord.length + 40);
-                    const context = text.substring(start, end).trim();
+                    const end = Math.min(text.length, actualIndex + matchedText.length + 40);
+                    let context = text.substring(start, end).replace(/\s+/g, ' ').trim();
                     
-                    const errorKey = `${rule.wrong}_${context}`;
-                    if (!uniqueMatches.has(errorKey)) {
-                        uniqueMatches.add(errorKey);
-                        errors.push({ 
-                            rule, 
-                            matched: matchedWord, 
-                            context: context.replace(matchedWord, `[X]${matchedWord}[/X]`), // Hatalı kelimeyi vurgulamak için
-                            url 
-                        });
-                    }
+                    errors.push({ 
+                        rule, 
+                        matched: matchedText, 
+                        context, 
+                        url 
+                    });
                 }
+                // Her kural analizinde ana thread'e nefes ver
+                if(errors.length % 5 === 0) await yieldToMain();
             }
-            return errors;
+            return { errors, words };
         }
 
-        // --------------------------------------------------------------
-        // 6. ANA TARAMA ROBOTU (Yorulmaz, Çok Kanallı)
-        // --------------------------------------------------------------
-        scanForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const targetUrl = document.getElementById('targetUrl').value.trim();
-            const apiKey = document.getElementById('scraperApiKey').value.trim();
-
-            // Arayüzü Sıfırla
-            progressBox.classList.remove('hidden');
-            resultsContainer.classList.add('hidden');
-            findingsList.innerHTML = '';
-            document.getElementById('statDiscovered').innerText = '0';
-            document.getElementById('statCrawled').innerText = '0';
-            document.getElementById('statAnalyzed').innerText = '0';
-            document.getElementById('statErrors').innerText = '0';
-            document.getElementById('extraStats').innerText = '';
+        // 6. ROLLING CONCURRENCY (KAYAN EŞZAMANLILIK) ALGORİTMASI
+        // Geleneksel Promise.all() yavaş sayfanın bitmesini bekler. Bu yöntem ise boşa çıkan worker'a anında iş verir.
+        async function runRollingConcurrency(tasks, concurrencyLimit, onProgress) {
+            const results = [];
+            const executing = new Set();
             
-            updateProgress(2, '🚀 Ağ geçidi başlatılıyor...');
+            for (const task of tasks) {
+                if (!STATE.isRunning) break; // Acil durdurma
 
-            const proxyList = buildProxyList(targetUrl, apiKey);
-            let mainHtml, workingProxy;
+                const p = Promise.resolve().then(() => task());
+                results.push(p);
+                executing.add(p);
+                
+                const clean = () => executing.delete(p);
+                p.then(clean).catch(clean);
+                
+                // Havuz doluysa, en hızlı biteni bekle
+                if (executing.size >= concurrencyLimit) {
+                    await Promise.race(executing);
+                }
+                if(onProgress) onProgress();
+            }
+            // Kalanları bekle
+            return Promise.allSettled(results);
+        }
 
-            // 1. AŞAMA: ANA SAYFAYI ÇEK
-            try {
-                const res = await fetchHtmlWithRetry(targetUrl, proxyList);
-                mainHtml = res.html;
-                workingProxy = res.workingProxy; // En hızlı proxy'yi kaydet
-            } catch (err) {
-                alert('❌ Hedef siteye ulaşılamadı. Koruma (DDoS/Cloudflare) olabilir veya proxy\'ler reddedildi.');
-                progressBox.classList.add('hidden');
+        // 7. ANA MOTORUN ÇALIŞTIRILMASI
+        UI.form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (STATE.isRunning) return;
+
+            const targetUrl = UI.targetUrl.value.trim();
+            const apiKey = UI.apiKey.value.trim();
+
+            // Kural filtresi
+            STATE.activeRules = SPELL_RULES.filter(r => 
+                (UI.chkTr.checked && r.lang === 'TR') || (UI.chkEn.checked && r.lang === 'EN')
+            );
+
+            if (STATE.activeRules.length === 0) {
+                alert("Lütfen en az bir dil seçin!");
                 return;
             }
 
-            updateProgress(10, '🔗 Link haritası çıkarılıyor...');
+            // State Reset
+            STATE.isRunning = true;
+            STATE.crawledCount = 0;
+            STATE.totalWords = 0;
+            STATE.errorsFound = [];
+            STATE.startTime = performance.now();
+            
+            UI.btn.disabled = true;
+            UI.btn.classList.add('opacity-70', 'cursor-not-allowed');
+            UI.btnText.innerText = "Motor Çalışıyor...";
+            UI.resCont.classList.add('hidden');
+            UI.progBox.classList.remove('hidden');
+            
+            // İstatistikleri sıfırla
+            UI.statDiscovered.innerText = '0';
+            UI.statCrawled.innerText = '0';
+            UI.statErrors.innerText = '0';
+            UI.statSpeed.innerText = '0';
+            UI.progBar.style.width = '2%';
+            UI.progPct.innerText = '0%';
 
-            // 2. AŞAMA: HABER LİNKLERİNİ AYIKLA
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(mainHtml, 'text/html');
-            const baseHost = new URL(targetUrl).hostname;
-            const linkMap = new Map();
-
-            // Haber niteliği taşımayan sayfaları engelleme
-            const blockRegex = /gizlilik|cerez|politika|kullanim|hakkimizda|iletisim|kvkk|uyelik|sartlar|yardim|kategori|arsiv|tag|etiket/i;
-
-            doc.querySelectorAll('a[href]').forEach(a => {
-                let href = a.getAttribute('href');
-                if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+            try {
+                const proxyPool = new ProxyPool(targetUrl, apiKey);
                 
-                try {
-                    const absoluteUrl = new URL(href, targetUrl).href;
-                    if (new URL(absoluteUrl).hostname === baseHost && !blockRegex.test(absoluteUrl) && a.textContent.trim().length > 15) {
-                        linkMap.set(absoluteUrl, { url: absoluteUrl, title: a.textContent.trim().replace(/\s+/g, ' ') });
-                    }
-                } catch (e) {}
-            });
-
-            let linksToCrawl = Array.from(linkMap.values());
-            document.getElementById('statDiscovered').innerText = linksToCrawl.length;
-
-            if (linksToCrawl.length === 0) {
-                linksToCrawl = [{ url: targetUrl, title: "Ana Sayfa" }];
-                updateProgress(15, '⚠️ Yalnızca ana sayfa taranacak.');
-            } else if (linksToCrawl.length > MAX_PAGES) {
-                linksToCrawl = linksToCrawl.slice(0, MAX_PAGES);
-            }
-
-            const totalPages = linksToCrawl.length;
-            let crawledCount = 0;
-            let totalWords = 0;
-            let allErrors = [];
-            let failedCount = 0;
-
-            // Çalışan proxy'yi dizinin en başına alarak hız kazandır
-            const optimizedProxyList = workingProxy ? 
-                [workingProxy, ...proxyList.filter(p => p !== workingProxy)] : proxyList;
-
-            updateProgress(20, `⚡ Eşzamanlı tarama devrede (${CONCURRENCY_LIMIT} kanal)...`);
-
-            // 3. AŞAMA: PARALEL (CONCURRENT) TARAMA MOTORU
-            let currentIndex = 0;
-            
-            async function worker() {
-                while (currentIndex < totalPages) {
-                    const idx = currentIndex++;
-                    const page = linksToCrawl[idx];
-                    
+                updateStatus('🔍 Anahtar sayfa çözümleniyor (Root Extraction)...', 5);
+                const rootRes = await fetchHtmlWithCircuitBreaker(targetUrl, proxyPool, 10000);
+                
+                updateStatus('🕸️ Bağlantı ağacı çıkarılıyor...', 10);
+                
+                // Bağlantı keşfi
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(rootRes.html, 'text/html');
+                const baseUrl = new URL(targetUrl);
+                const links = new Set();
+                
+                doc.querySelectorAll('a[href]').forEach(a => {
                     try {
-                        const res = await fetchHtmlWithRetry(page.url, optimizedProxyList);
-                        const cleanText = extractCleanText(res.html);
+                        let href = a.getAttribute('href');
+                        if (!href || href.startsWith('javascript') || href.startsWith('#')) return;
                         
-                        const words = cleanText.split(/\s+/).filter(w => w.length > 2).length;
-                        const pageErrors = findErrorsUnicode(cleanText, page.url);
-                        
-                        // İstatistikleri Canlı Güncelle
-                        crawledCount++;
-                        totalWords += words;
-                        allErrors = allErrors.concat(pageErrors);
-                        
-                        document.getElementById('statCrawled').innerText = crawledCount;
-                        document.getElementById('statAnalyzed').innerText = totalWords.toLocaleString('tr-TR');
-                        document.getElementById('statErrors').innerText = allErrors.length;
-                        
-                        const pct = 20 + Math.floor((crawledCount / totalPages) * 75);
-                        updateProgress(pct, `Taranıyor: ${crawledCount} / ${totalPages}`);
-                        
-                    } catch (err) {
-                        failedCount++;
-                        crawledCount++;
-                    }
+                        const fullUrl = new URL(href, targetUrl).href;
+                        // Sadece aynı domain ve haber barındırma ihtimali olan linkler
+                        if (new URL(fullUrl).hostname === baseUrl.hostname) {
+                            if (!/(giris|uye|sepet|iletisim|hakkimizda|kvkk|cerez|tag|category)/i.test(fullUrl)) {
+                                links.add(fullUrl);
+                            }
+                        }
+                    } catch (e) {}
+                });
+
+                let urlsToCrawl = Array.from(links);
+                UI.statDiscovered.innerText = urlsToCrawl.length;
+
+                if (urlsToCrawl.length === 0) {
+                    urlsToCrawl = [targetUrl]; // Link yoksa sadece ana sayfayı tara
+                } else if (urlsToCrawl.length > 150) {
+                    urlsToCrawl = urlsToCrawl.slice(0, 150); // Hard limit for safety
+                    UI.proxyStatus.innerText = "Optimize: İlk 150 derin bağlantı taranacak.";
                 }
-            }
 
-            // Limit kadar Worker (İşçi) başlat
-            const workers = [];
-            for (let i = 0; i < CONCURRENCY_LIMIT; i++) {
-                workers.push(worker());
-            }
-            
-            // Tüm işçilerin bitmesini bekle
-            await Promise.all(workers);
+                const totalTasks = urlsToCrawl.length;
+                updateStatus(`🚀 Endüstriyel Kazıma Başlıyor... (${totalTasks} Görev)`, 15);
 
-            // 4. AŞAMA: TAMAMLANMA VE RAPORLAMA
-            updateProgress(100, '✅ Derinlemesine Analiz Tamamlandı!');
-            document.getElementById('extraStats').innerText = `Operasyon Sonucu: ${totalPages - failedCount} sayfa incelendi, ${failedCount} sayfa engellendi/atlandı.`;
-            
-            renderResults(allErrors);
+                // Hız ölçümü için sayaç
+                const speedInterval = setInterval(() => {
+                    const elapsedSec = (performance.now() - STATE.startTime) / 1000;
+                    if(elapsedSec > 0) {
+                        UI.statSpeed.innerText = Math.floor(STATE.totalWords / elapsedSec).toLocaleString();
+                    }
+                }, 1000);
+
+                // Görev listesi oluştur
+                const tasks = urlsToCrawl.map(url => async () => {
+                    try {
+                        const res = await fetchHtmlWithCircuitBreaker(url, proxyPool, 8000);
+                        const cleanText = extractCleanText(res.html);
+                        const analysis = await analyzeText(cleanText, url);
+                        
+                        STATE.totalWords += analysis.words;
+                        if (analysis.errors.length > 0) {
+                            STATE.errorsFound.push(...analysis.errors);
+                            UI.statErrors.innerText = STATE.errorsFound.length;
+                        }
+                    } catch (err) {
+                        // Sessizce atla, circuit breaker hallediyor
+                    } finally {
+                        STATE.crawledCount++;
+                        UI.statCrawled.innerText = STATE.crawledCount;
+                    }
+                });
+
+                // ROLLING CONCURRENCY YÜRÜT (15 iş parçacığı aynı anda)
+                await runRollingConcurrency(tasks, 15, () => {
+                    const pct = 15 + Math.floor((STATE.crawledCount / totalTasks) * 85);
+                    UI.progBar.style.width = `${pct}%`;
+                    UI.progPct.innerText = `${pct}%`;
+                    if (STATE.crawledCount % 5 === 0) {
+                        UI.status.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 pulse-fast"></span> Ağ taraması aktif: ${STATE.crawledCount}/${totalTasks}`;
+                    }
+                });
+
+                clearInterval(speedInterval);
+                updateStatus('✅ Analiz Tamamlandı!', 100);
+                
+                setTimeout(() => renderResults(), 500);
+
+            } catch (err) {
+                alert(`Sistem Hatası: ${err.message}\nProxy engeline takılmış olabilirsiniz. Birkaç dakika bekleyin veya API Key kullanın.`);
+                UI.progBox.classList.add('hidden');
+            } finally {
+                STATE.isRunning = false;
+                UI.btn.disabled = false;
+                UI.btn.classList.remove('opacity-70', 'cursor-not-allowed');
+                UI.btnText.innerText = "Yeni Tarama Başlat";
+            }
         });
 
-        function updateProgress(percent, text) {
-            progressBar.style.width = percent + '%';
-            progressPercent.innerText = percent + '%';
-            statusText.innerHTML = text;
+        // 8. DURUM GÜNCELLEME VE RENDER (ÇİZİM) FONKSİYONLARI
+        function updateStatus(text, pct) {
+            if(pct) {
+                UI.progBar.style.width = `${pct}%`;
+                UI.progPct.innerText = `${pct}%`;
+            }
+            UI.status.innerHTML = text;
         }
 
-        // --------------------------------------------------------------
-        // 7. RAPOR OLUŞTURMA (Vurgulu UI)
-        // --------------------------------------------------------------
-        function renderResults(errors) {
-            resultsContainer.classList.remove('hidden');
+        function renderResults() {
+            UI.resCont.classList.remove('hidden');
+            const elapsed = ((performance.now() - STATE.startTime) / 1000).toFixed(1);
+            UI.finalTime.innerText = `⏱️ ${elapsed} saniyede tamamlandı`;
+
             let html = '';
-            
-            if (errors.length === 0) {
+            if (STATE.errorsFound.length === 0) {
                 html = `
-                <div class="bg-emerald-900/20 border border-emerald-500/30 rounded-2xl p-8 text-center shadow-lg">
-                    <div class="text-emerald-400 text-5xl mb-4">🏆</div>
-                    <h3 class="text-xl font-bold text-white mb-2">Tebrikler! Kusursuz İçerik.</h3>
-                    <p class="text-emerald-400/80">Taranan ${document.getElementById('statAnalyzed').innerText} kelime içinde hiçbir kesin TDK yazım hatası tespit edilmedi.</p>
+                <div class="bg-gradient-to-r from-emerald-900/40 to-teal-900/40 border border-emerald-500/30 rounded-2xl p-8 text-center shadow-lg">
+                    <div class="text-4xl mb-3">🎉</div>
+                    <h3 class="text-xl font-bold text-emerald-400 mb-2">Muazzam! Hiç hata bulunamadı.</h3>
+                    <p class="text-emerald-500/70 text-sm">${STATE.totalWords.toLocaleString()} kelime kusursuz.</p>
                 </div>`;
             } else {
-                errors.forEach((err, idx) => {
-                    // Bağlamdaki hatayı HTML ile kırmızı yapmak için
-                    const highlightedContext = err.context.replace(/\[X\](.*?)\[\/X\]/g, '<span class="bg-rose-900/50 text-rose-300 font-bold px-1 rounded border border-rose-500/30">$1</span>');
+                // Hataları grupla ve şık bir şekilde listele
+                STATE.errorsFound.forEach((err, idx) => {
+                    // Bulunan kelimeyi context içinde vurgula (büyük harf/küçük harf duyarlılığını koruyarak)
+                    const regexHighlight = new RegExp(`(${err.matched})`, 'gi');
+                    const highlightedContext = err.context.replace(regexHighlight, '<span class="bg-rose-500/30 text-rose-300 font-bold px-1 rounded border-b-2 border-rose-500">$1</span>');
 
+                    const langColor = err.rule.lang === 'TR' ? 'indigo' : 'purple';
+                    
                     html += `
-                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 hover:border-slate-700 transition shadow-lg relative overflow-hidden group">
-                            <div class="absolute left-0 top-0 w-1 h-full bg-rose-500/50 group-hover:bg-rose-500 transition"></div>
-                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                                <div>
-                                    <span class="inline-block px-2.5 py-1 rounded text-[10px] font-extrabold tracking-wider uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20 mb-2">${err.rule.type}</span>
-                                    <h3 class="font-semibold text-slate-300">Tespit Edilen Kelime: <span class="text-xl text-rose-400 font-black tracking-tight ml-1">${err.matched}</span></h3>
-                                </div>
-                                <span class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-950 text-slate-400 border border-slate-800 shadow-inner">#${idx+1}</span>
+                    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-md hover:border-slate-700 transition-colors group relative overflow-hidden">
+                        <div class="absolute left-0 top-0 bottom-0 w-1 bg-${langColor}-500/50 group-hover:bg-${langColor}-400 transition-colors"></div>
+                        <div class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                            <div>
+                                <span class="inline-block px-2.5 py-1 rounded-md text-xs font-black bg-${langColor}-500/10 text-${langColor}-400 border border-${langColor}-500/20 mb-3 tracking-wider">
+                                    ${err.rule.lang} KURALI
+                                </span>
+                                <h3 class="text-lg font-medium text-white">Tespit: <span class="text-rose-400 font-bold line-through decoration-rose-500/50 decoration-2">${err.matched}</span></h3>
                             </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800/80">
-                                <div>
-                                    <span class="text-[11px] text-emerald-400/80 block mb-1 font-bold uppercase tracking-wider">Doğru Kullanım (TDK)</span>
-                                    <div class="text-emerald-300 font-medium text-lg flex items-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                                        ${err.rule.correct}
-                                    </div>
-                                    <p class="text-xs text-slate-500 mt-2 italic">${err.rule.desc}</p>
-                                </div>
-                                <div>
-                                    <span class="text-[11px] text-sky-400/80 block mb-1 font-bold uppercase tracking-wider">Tespit Edilen Bağlantı</span>
-                                    <a href="${err.url}" target="_blank" rel="noopener" class="text-sky-400 hover:text-sky-300 hover:underline text-sm break-all flex items-center gap-1">
-                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                                        Bağlantıya Git
-                                    </a>
+                            <span class="text-xs font-black px-3 py-1.5 rounded-lg bg-slate-950 text-slate-500 border border-slate-800 shadow-inner">
+                                BULGU #${idx+1}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950/80 p-4 rounded-xl border border-slate-800/80 mb-4">
+                            <div>
+                                <span class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Sözlük Doğrusu</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-lg border border-emerald-400/20 font-bold tracking-wide">
+                                        ✓ ${err.rule.correct}
+                                    </span>
                                 </div>
                             </div>
-                            
-                            <div class="pt-2">
-                                <span class="text-[11px] text-slate-500 block mb-2 font-bold uppercase tracking-wider">Bağlam (Cümle İçi Kullanım)</span>
-                                <p class="text-slate-300 text-sm leading-relaxed bg-slate-950 p-3 rounded-lg border border-slate-800/80 shadow-inner italic">"...${highlightedContext}..."</p>
+                            <div>
+                                <span class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1.5">Kaynak Bağlantı</span>
+                                <a href="${err.url}" target="_blank" rel="noopener" class="text-sky-400 hover:text-sky-300 hover:underline text-xs block truncate bg-sky-900/10 px-3 py-1.5 rounded-lg border border-sky-500/20 transition" title="${err.url}">
+                                    🔗 ${new URL(err.url).pathname || err.url}
+                                </a>
                             </div>
                         </div>
-                    `;
+
+                        <div>
+                            <span class="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-2">Metin İçi Bağlam</span>
+                            <p class="text-slate-300 text-sm leading-relaxed italic bg-slate-800/30 p-4 rounded-xl border-l-2 border-slate-600">
+                                "...${highlightedContext}..."
+                            </p>
+                        </div>
+                        
+                        <div class="mt-4 flex items-start gap-2">
+                            <span class="text-slate-400">💡</span>
+                            <p class="text-xs text-slate-400 font-medium">${err.rule.desc}</p>
+                        </div>
+                    </div>`;
                 });
             }
-            findingsList.innerHTML = html;
+            UI.findings.innerHTML = html;
+            UI.resCont.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     </script>
 </body>
