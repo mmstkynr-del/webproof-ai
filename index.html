@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>WebProof AI - Türkçe ve İngilizce Yazım Denetimi</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+body{
+    font-family:Inter,Arial,sans-serif;
+}
+
+.spinner{
+    width:22px;
+    height:22px;
+    border:3px solid #334155;
+    border-top-color:#38bdf8;
+    border-radius:50%;
+    animation:spin .8s linear infinite;
+}
+
+@keyframes spin{
+    to{transform:rotate(360deg)}
+}
+
+mark{
+    background:#7f1d1d;
+    color:#fecaca;
+    padding:2px 4px;
+    border-radius:4px;
+}
+</style>
+</head>
+
+<body class="bg-slate-950 text-white min-h-screen">
+
+<header class="border-b border-slate-800 bg-slate-900">
+<div class="max-w-6xl mx-auto px-5 py-5">
+
+<div class="flex justify-between items-center">
+
+<div>
+<h1 class="text-2xl font-black">
+WebProof <span class="text-sky-400">AI</span>
+</h1>
+
+<p class="text-xs text-slate-500">
+Gerçek yazım ve dilbilgisi denetimi
+</p>
+</div>
+
+<div id="connection"
+class="text-xs px-3 py-2 rounded-lg bg-slate-800 text-slate-400">
+Motor kontrol ediliyor...
+</div>
+
+</div>
+
+</div>
+</header>
+
+
+<main class="max-w-6xl mx-auto px-5 py-10">
+
+
+<section class="max-w-4xl mx-auto">
+
+<div class="text-center mb-8">
+
+<h2 class="text-4xl font-black mb-3">
+Web Sitesi Yazım Denetimi
+</h2>
+
+<p class="text-slate-400">
+Türkçe ve İngilizce metinleri gerçek bir dil denetim motoruyla kontrol edin.
+</p>
+
+</div>
+
+
+<div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+
+<label class="block text-sm font-bold mb-2">
+Taranacak site
+</label>
+
+<div class="flex gap-3">
+
+<input
+id="siteUrl"
+type="url"
+placeholder="https://ornek.com"
+class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:border-sky-500"
+/>
+
+<button
+id="scanButton"
+class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-6 py-3 rounded-xl">
+
+Siteyi Tara
+
+</button>
+
+</div>
+
+
+<div class="flex gap-6 mt-5 text-sm">
+
+<label class="flex gap-2 items-center">
+<input id="trCheck" type="checkbox" checked>
+Türkçe
+</label>
+
+<label class="flex gap-2 items-center">
+<input id="enCheck" type="checkbox" checked>
+İngilizce
+</label>
+
+</div>
+
+</div>
+
+
+<div id="statusBox"
+class="hidden mt-6 bg-slate-900 border border-slate-800 rounded-2xl p-5">
+
+<div class="flex items-center gap-3">
+
+<div id="spinner" class="spinner"></div>
+
+<div>
+
+<div id="statusText"
+class="font-bold">
+Hazırlanıyor...
+</div>
+
+<div id="statusDetail"
+class="text-xs text-slate-500">
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<div id="summary"
+class="hidden grid grid-cols-3 gap-4 mt-6">
+
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 text-center">
+
+<div class="text-xs text-slate-500">
+TARANAN SAYFA
+</div>
+
+<div id="pageCount"
+class="text-3xl font-black text-sky-400">
+0
+</div>
+
+</div>
+
+
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 text-center">
+
+<div class="text-xs text-slate-500">
+KONTROL EDİLEN KELİME
+</div>
+
+<div id="wordCount"
+class="text-3xl font-black text-emerald-400">
+0
+</div>
+
+</div>
+
+
+<div class="bg-slate-900 border border-slate-800 rounded-xl p-5 text-center">
+
+<div class="text-xs text-slate-500">
+BULUNAN HATA
+</div>
+
+<div id="errorCount"
+class="text-3xl font-black text-rose-400">
+0
+</div>
+
+</div>
+
+</div>
+
+
+<div id="results"
+class="mt-8 space-y-5">
+</div>
+
+</section>
+
+</main>
+
+
+<script>
+
+/*
+====================================================
+BURAYA CLOUDFLARE WORKER ADRESİNİ YAZ
+====================================================
+*/
+
+const WORKER_URL =
+"https://SENIN-WORKER-ADRESIN.workers.dev";
+
+
+const $ = id =>
+document.getElementById(id);
+
+
+const state = {
+    pages:0,
+    words:0,
+    errors:0
+};
+
+
+/*
+====================================================
+WORKER TESTİ
+====================================================
+*/
+
+async function testWorker(){
+
+    try{
+
+        const response =
+            await fetch(
+                WORKER_URL + "/health"
+            );
+
+        if(!response.ok)
+            throw new Error();
+
+        const data =
+            await response.json();
+
+        if(data.ok){
+
+            $("connection").textContent =
+                "✓ Motor bağlı";
+
+            $("connection").className =
+                "text-xs px-3 py-2 rounded-lg bg-emerald-500/10 text-emerald-400";
+
+        }
+
+    }catch(error){
+
+        $("connection").textContent =
+            "✗ Motor bağlantısı yok";
+
+        $("connection").className =
+            "text-xs px-3 py-2 rounded-lg bg-rose-500/10 text-rose-400";
+
+    }
+
+}
+
+
+testWorker();
+
+
+/*
+====================================================
+METİNİ WORKER'A GÖNDER
+====================================================
+*/
+
+async function checkText(text,language){
+
+    const response =
+        await fetch(
+            WORKER_URL + "/check",
+            {
+                method:"POST",
+
+                headers:{
+                    "Content-Type":
+                    "application/json"
+                },
+
+                body:JSON.stringify({
+                    text:text,
+                    language:language
+                })
+            }
+        );
+
+
+    if(!response.ok){
+
+        throw new Error(
+            "Worker HTTP " +
+            response.status
+        );
+
+    }
+
+
+    const data =
+        await response.json();
+
+
+    if(!data.ok){
+
+        throw new Error(
+            data.error ||
+            "Denetim başarısız."
+        );
+
+    }
+
+
+    return data;
+
+}
+
+
+/*
+====================================================
+HTML'DEN TEMİZ METİN ÇIKAR
+====================================================
+*/
+
+function extractText(html){
+
+    const parser =
+        new DOMParser();
+
+    const doc =
+        parser.parseFromString(
+            html,
+            "text/html"
+        );
+
+
+    doc.querySelectorAll(
+        "script,style,noscript,svg,iframe,nav,footer,header"
+    ).forEach(el =>
+        el.remove()
+    );
+
+
+    return (
+        doc.body?.innerText ||
+        ""
+    ).replace(
+        /\s+/g,
+        " "
+    ).trim();
+
+}
+
+
+/*
+====================================================
+AYNI SİTEDEKİ LİNKLERİ BUL
+====================================================
+*/
+
+function getInternalLinks(
+    html,
+    baseUrl
+){
+
+    const parser =
+        new DOMParser();
+
+    const doc =
+        parser.parseFromString(
+            html,
+            "text/html"
+        );
+
+
+    const links =
+        new Set();
+
+
+    doc.querySelectorAll(
+        "a[href]"
+    ).forEach(a => {
+
+        try{
+
+            const href =
+                a.getAttribute(
+                    "href"
+                );
+
+            if(!href)
+                return;
+
+            if(
+                href.startsWith(
+                    "javascript:"
+                )
+            )
+                return;
+
+            if(
+                href.startsWith(
+                    "mailto:"
+                )
+            )
+                return;
+
+
+            const absolute =
+                new URL(
+                    href,
+                    baseUrl
+                );
+
+
+            if(
+                absolute.hostname !==
+                new URL(baseUrl).hostname
+            )
+                return;
+
+
+            absolute.hash = "";
+
+
+            links.add(
+                absolute.href
+            );
+
+        }catch(e){}
+
+    });
+
+
+    return [
+        ...links
+    ];
+
+}
+
+
+/*
+====================================================
+SAYFAYI GETİR
+====================================================
+*/
+
+async function fetchPage(url){
+
+    /*
+    Tarayıcı doğrudan başka sitelere erişemeyebilir.
+    Worker'ın kendisi sayfayı almıyor.
+    Bu nedenle public CORS proxy deneniyor.
+    */
+
+    const proxies = [
+
+        "https://api.allorigins.win/raw?url=",
+
+        "https://corsproxy.io/?",
+
+        "https://api.codetabs.com/v1/proxy?quest="
+
+    ];
+
+
+    for(
+        const proxy of proxies
+    ){
+
+        try{
+
+            const response =
+                await fetch(
+                    proxy +
+                    encodeURIComponent(url)
+                );
+
+
+            if(
+                response.ok
+            ){
+
+                const html =
+                    await response.text();
+
+
+                if(
+                    html.length > 500
+                ){
+
+                    return html;
+
+                }
+
+            }
+
+        }catch(e){}
+
+    }
+
+
+    throw new Error(
+        "Sayfaya erişilemedi."
+    );
+
+}
+
+
+/*
+====================================================
+SONUÇ KARTI
+====================================================
+*/
+
+function renderPageResult(
+    url,
+    text,
+    matches
+){
+
+    const box =
+        document.createElement(
+            "div"
+        );
+
+
+    box.className =
+        "bg-slate-900 border border-slate-800 rounded-2xl p-6";
+
+
+    let html = `
+
+        <div class="mb-5">
+
+            <div class="text-xs text-slate-500 mb-1">
+                SAYFA
+            </div>
+
+            <a
+                href="${escapeHtml(url)}"
+                target="_blank"
+                class="text-sky-400 text-sm break-all">
+
+                ${escapeHtml(url)}
+
+            </a>
+
+        </div>
+
+    `;
+
+
+    if(
+        matches.length === 0
+    ){
+
+        html += `
+
+        <div class="bg-emerald-500/10
+                    border border-emerald-500/20
+                    rounded-xl
+                    p-4
+                    text-emerald-400">
+
+            ✓ Bu sayfada motor tarafından
+            hata bulunmadı.
+
+        </div>
+
+        `;
+
+    }else{
+
+        matches.forEach(
+            (match,index) => {
+
+                const suggestions =
+                    match.replacements || [];
+
+
+                const suggestionText =
+                    suggestions.length
+                    ? suggestions
+                        .slice(0,5)
+                        .join(", ")
+                    : "Öneri yok";
+
+
+                const start =
+                    Math.max(
+                        0,
+                        match.offset - 70
+                    );
+
+
+                const end =
+                    Math.min(
+                        text.length,
+                        match.offset +
+                        match.length +
+                        70
+                    );
+
+
+                const context =
+                    text.substring(
+                        start,
+                        end
+                    );
+
+
+                const highlighted =
+                    escapeHtml(
+                        context
+                    );
+
+
+                html += `
+
+                <div class="border border-slate-800
+                            rounded-xl
+                            p-4
+                            mb-3">
+
+                    <div class="flex justify-between gap-4">
+
+                        <div>
+
+                            <div class="text-xs
+                                        text-rose-400
+                                        font-bold
+                                        mb-2">
+
+                                HATA #${index + 1}
+
+                            </div>
+
+                            <div class="text-white font-bold">
+
+                                ${escapeHtml(
+                                    match.message
+                                )}
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="mt-4">
+
+                        <div class="text-xs text-slate-500 mb-1">
+                            ÖNERİLEN
+                        </div>
+
+                        <div class="text-emerald-400 font-bold">
+
+                            ${escapeHtml(
+                                suggestionText
+                            )}
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="mt-4">
+
+                        <div class="text-xs text-slate-500 mb-1">
+                            METİN BAĞLAMI
+                        </div>
+
+                        <div class="text-sm
+                                    text-slate-300
+                                    bg-slate-950
+                                    rounded-lg
+                                    p-3">
+
+                            ${highlighted}
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="mt-3 text-xs text-slate-600">
+
+                        Kural:
+                        ${escapeHtml(
+                            match.rule || "-"
+                        )}
+
+                    </div>
+
+                </div>
+
+                `;
+
+            }
+        );
+
+    }
+
+
+    box.innerHTML =
+        html;
+
+
+    $("results")
+        .appendChild(box);
+
+}
+
+
+/*
+====================================================
+HTML ESCAPE
+====================================================
+*/
+
+function escapeHtml(value){
+
+    return String(value)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+
+}
+
+
+/*
+====================================================
+TARAMA
+====================================================
+*/
+
+$("scanButton")
+.addEventListener(
+"click",
+async () => {
+
+    const target =
+        $("siteUrl")
+        .value
+        .trim();
+
+
+    if(!target){
+
+        alert(
+            "Lütfen bir site adresi girin."
+        );
+
+        return;
+
+    }
+
+
+    let root;
+
+    try{
+
+        root =
+            new URL(target);
+
+    }catch{
+
+        alert(
+            "Geçerli bir URL girin."
+        );
+
+        return;
+
+    }
+
+
+    const language =
+        $("trCheck").checked &&
+        !$("enCheck").checked
+        ? "tr"
+        :
+        !$("trCheck").checked &&
+        $("enCheck").checked
+        ? "en"
+        : "auto";
+
+
+    $("scanButton").disabled =
+        true;
+
+
+    $("scanButton").textContent =
+        "Taranıyor...";
+
+
+    $("statusBox")
+        .classList
+        .remove("hidden");
+
+
+    $("summary")
+        .classList
+        .remove("hidden");
+
+
+    $("results")
+        .innerHTML =
+        "";
+
+
+    state.pages =
+        0;
+
+    state.words =
+        0;
+
+    state.errors =
+        0;
+
+
+    updateStats();
+
+
+    try{
+
+        /*
+        ============================================
+        ANA SAYFA
+        ============================================
+        */
+
+        $("statusText")
+            .textContent =
+            "Ana sayfa alınıyor...";
+
+
+        let rootHtml =
+            await fetchPage(
+                root.href
+            );
+
+
+        /*
+        ============================================
+        LİNKLER
+        ============================================
+        */
+
+        let links =
+            getInternalLinks(
+                rootHtml,
+                root.href
+            );
+
+
+        /*
+        İlk aşamada aşırı büyümeyi
+        engellemek için maksimum 100 sayfa.
+        */
+
+        links = [
+            root.href,
+            ...links
+        ]
+        .filter(
+            (v,i,a) =>
+            a.indexOf(v) === i
+        )
+        .slice(
+            0,
+            100
+        );
+
+
+        $("statusDetail")
+            .textContent =
+            links.length +
+            " sayfa bulundu.";
+
+
+        /*
+        ============================================
+        SAYFALARI TARA
+        ============================================
+        */
+
+        for(
+            let i=0;
+            i<links.length;
+            i++
+        ){
+
+            const url =
+                links[i];
+
+
+            $("statusText")
+                .textContent =
+                `Sayfa ${i+1}/${links.length} taranıyor...`;
+
+
+            try{
+
+                let html;
+
+
+                if(
+                    url === root.href
+                ){
+
+                    html =
+                        rootHtml;
+
+                }else{
+
+                    html =
+                        await fetchPage(
+                            url
+                        );
+
+                }
+
+
+                const text =
+                    extractText(
+                        html
+                    );
+
+
+                if(
+                    text.length < 20
+                )
+                    continue;
+
+
+                state.words +=
+                    text
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .length;
+
+
+                const result =
+                    await checkText(
+                        text,
+                        language
+                    );
+
+
+                state.pages++;
+
+
+                state.errors +=
+                    result.total || 0;
+
+
+                renderPageResult(
+                    url,
+                    text,
+                    result.matches || []
+                );
+
+
+                updateStats();
+
+
+            }catch(error){
+
+                console.warn(
+                    "Sayfa atlandı:",
+                    url,
+                    error
+                );
+
+            }
+
+        }
+
+
+        $("statusText")
+            .textContent =
+            "✓ Tarama tamamlandı";
+
+
+        $("statusDetail")
+            .textContent =
+            `${state.pages} sayfa analiz edildi.`;
+
+
+    }catch(error){
+
+        $("statusText")
+            .textContent =
+            "✗ Tarama başarısız";
+
+
+        $("statusDetail")
+            .textContent =
+            error.message;
+
+
+        $("results").innerHTML = `
+
+        <div class="bg-rose-500/10
+                    border border-rose-500/30
+                    rounded-xl
+                    p-5
+                    text-rose-300">
+
+            <strong>Hata:</strong>
+            ${escapeHtml(error.message)}
+
+        </div>
+
+        `;
+
+    }finally{
+
+        $("scanButton").disabled =
+            false;
+
+
+        $("scanButton").textContent =
+            "Siteyi Tara";
+
+    }
+
+});
+
+
+function updateStats(){
+
+    $("pageCount")
+        .textContent =
+        state.pages
+        .toLocaleString();
+
+
+    $("wordCount")
+        .textContent =
+        state.words
+        .toLocaleString();
+
+
+    $("errorCount")
+        .textContent =
+        state.errors
+        .toLocaleString();
+
+}
+
+</script>
+
+</body>
+</html>
