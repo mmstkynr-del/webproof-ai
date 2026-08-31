@@ -13,16 +13,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: NanoBot kurulumu
+      - name: NanoBot ve Gemini SDK kurulumu
         run: |
           python -m pip install --upgrade pip
-          pip install nanobot-ai
+          pip install nanobot-ai google-genai
 
       - name: NanoBot kontrolü
         run: |
           nanobot --help
 
-      - name: Gemini API kontrolü
+      - name: Gemini API testi
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -30,21 +30,41 @@ jobs:
           import os
           from google import genai
 
+          api_key = os.environ.get("GEMINI_API_KEY")
+
+          if not api_key:
+              raise RuntimeError(
+                  "GEMINI_API_KEY GitHub Secret bulunamadı."
+              )
+
+          print("Gemini API anahtarı bulundu.")
+          print("Gemini'ye bağlanılıyor...")
+
           client = genai.Client(
-              api_key=os.environ["GEMINI_API_KEY"]
+              api_key=api_key
           )
 
           response = client.models.generate_content(
               model="gemini-3.6-flash",
               contents="""
               Sen WebProof AI'ın yapay zeka ajanısın.
-              Görevin web sitelerini takip etmek,
-              değişiklikleri tespit etmek ve kullanıcıya bildirmektir.
 
-              Şimdilik sadece şunu söyle:
+              Görevin:
+              Kullanıcının verdiği web sitelerini takip etmek,
+              web sayfalarındaki değişiklikleri tespit etmek,
+              önemli değişiklikleri analiz etmek
+              ve kullanıcıya bildirmektir.
+
+              Şimdilik sadece şu cümleyi söyle:
+
               NanoBot ve Gemini bağlantısı başarılı.
               """
           )
 
+          print("")
+          print("===================================")
+          print("GEMINI CEVABI")
+          print("===================================")
           print(response.text)
+          print("===================================")
           PY
