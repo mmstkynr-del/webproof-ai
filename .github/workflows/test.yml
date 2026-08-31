@@ -9,13 +9,14 @@ jobs:
 
     steps:
       - name: Python kurulumu
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Gemini SDK kurulumu
         run: |
-          pip install google-genai
+          python -m pip install --upgrade pip
+          python -m pip install google-genai
 
       - name: Gemini testi
         env:
@@ -25,18 +26,25 @@ jobs:
           import os
           from google import genai
 
-          client = genai.Client(
-              api_key=os.environ["GEMINI_API_KEY"]
-          )
+          api_key = os.environ.get("GEMINI_API_KEY")
+
+          if not api_key:
+              raise RuntimeError("GEMINI_API_KEY GitHub Secret olarak bulunamadı.")
+
+          print("Gemini API anahtarı bulundu.")
+          print("Gemini'ye bağlanılıyor...")
+
+          client = genai.Client(api_key=api_key)
 
           response = client.models.generate_content(
               model="gemini-2.5-flash",
-              contents="Merhaba. WebProof AI için çalışan bir yapay zeka ajanısın. Bana tek cümleyle görevinin ne olduğunu söyle."
+              contents="Merhaba. WebProof AI için çalışan bir yapay zeka ajanısın. Görevinin ne olduğunu tek cümleyle söyle."
           )
 
-          print("===================================")
-          print("GEMINI CEVABI:")
-          print("===================================")
+          print("")
+          print("==============================")
+          print("GEMINI CEVABI")
+          print("==============================")
           print(response.text)
-          print("===================================")
+          print("==============================")
           PY
