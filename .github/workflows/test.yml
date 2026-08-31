@@ -1,22 +1,42 @@
-name: WebProof AI - NanoBot Test
+name: WebProof AI - Gemini Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  nanobot-test:
+  gemini-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Python kontrolü
-        run: |
-          python --version
-          pip --version
+      - name: Python kurulumu
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-      - name: NanoBot kurulumu
+      - name: Gemini SDK kurulumu
         run: |
-          pip install nanobot-ai
+          pip install google-genai
 
-      - name: NanoBot kontrolü
+      - name: Gemini testi
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          nanobot --help
+          python - <<'PY'
+          import os
+          from google import genai
+
+          client = genai.Client(
+              api_key=os.environ["GEMINI_API_KEY"]
+          )
+
+          response = client.models.generate_content(
+              model="gemini-2.5-flash",
+              contents="Merhaba. WebProof AI için çalışan bir yapay zeka ajanısın. Bana tek cümleyle görevinin ne olduğunu söyle."
+          )
+
+          print("===================================")
+          print("GEMINI CEVABI:")
+          print("===================================")
+          print(response.text)
+          print("===================================")
+          PY
