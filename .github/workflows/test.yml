@@ -1,14 +1,22 @@
-name: WebProof AI Test
+name: WebProof AI - NanoBot Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  nanobot-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test
+      - name: Python kontrolü
         run: |
-          echo "WebProof AI test sunucusu çalışıyor!"
           python --version
+          pip --version
+
+      - name: NanoBot kurulumu
+        run: |
+          pip install nanobot-ai
+
+      - name: NanoBot kontrolü
+        run: |
+          nanobot --help
