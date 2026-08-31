@@ -1,0 +1,36 @@
+name: WebProof AI - Web Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  web-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Web sayfasını indir
+        run: |
+          python - <<'PY'
+          import urllib.request
+
+          url = "https://example.com"
+
+          print("Web sitesi kontrol ediliyor:")
+          print(url)
+
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "User-Agent": "WebProof-AI/1.0"
+              }
+          )
+
+          with urllib.request.urlopen(request, timeout=20) as response:
+              html = response.read().decode("utf-8", errors="ignore")
+
+          print("")
+          print("HTTP:", response.status)
+          print("Karakter sayısı:", len(html))
+          print("")
+          print(html[:1000])
+          PY
