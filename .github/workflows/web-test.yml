@@ -24,6 +24,7 @@ jobs:
         run: |
           cat > test.py <<'PY'
           import os
+          import time
           import urllib.request
           from bs4 import BeautifulSoup
           from google import genai
@@ -34,11 +35,15 @@ jobs:
           print("WEBPROOF AI")
           print("BBC TÜRKÇE YAZIM DENETİMİ")
           print("======================================")
+          print("URL:", URL)
+          print("")
 
           api_key = os.environ.get("GEMINI_API_KEY")
 
           if not api_key:
-              raise RuntimeError("GEMINI_API_KEY bulunamadı.")
+              raise RuntimeError(
+                  "GEMINI_API_KEY bulunamadı."
+              )
 
           print("BBC Türkçe indiriliyor...")
 
@@ -53,6 +58,7 @@ jobs:
               request,
               timeout=30
           ) as response:
+
               html = response.read().decode(
                   "utf-8",
                   errors="ignore"
@@ -60,6 +66,7 @@ jobs:
 
           print("HTTP:", response.status)
           print("HTML karakter sayısı:", len(html))
+          print("")
 
           soup = BeautifulSoup(
               html,
@@ -70,7 +77,11 @@ jobs:
               "script",
               "style",
               "noscript",
-              "svg"
+              "svg",
+              "nav",
+              "footer",
+              "header",
+              "form"
           ]):
               tag.decompose()
 
@@ -95,10 +106,18 @@ jobs:
                   strip=True
               )
 
-          text = " ".join(text.split())
+          text = " ".join(
+              text.split()
+          )
 
-          print("Başlık:", title)
-          print("Metin karakter sayısı:", len(text))
+          print("Sayfa başlığı:")
+          print(title)
+          print("")
+
+          print(
+              "Temiz metin karakter sayısı:",
+              len(text)
+          )
 
           if len(text) < 100:
               raise RuntimeError(
@@ -110,33 +129,37 @@ jobs:
           prompt = f"""
           Sen WebProof AI'ın Türkçe yazım denetimi uzmanısın.
 
-          Aşağıdaki BBC Türkçe sayfasındaki metni kontrol et.
+          Aşağıdaki BBC Türkçe sayfasındaki metni incele.
 
-          SADECE:
+          SADECE şu hataları tespit et:
 
           1. Yazım yanlışları
           2. Noktalama yanlışları
-          3. Açık dilbilgisi yanlışları
+          3. Açık ve kesin dilbilgisi yanlışları
 
-          bul.
-
-          Kurallar:
+          KURALLAR:
 
           - Emin olmadığın ifadeyi hata olarak gösterme.
           - Özel isimleri hata olarak gösterme.
           - Haber üslubunu hata kabul etme.
           - Aynı hatayı tekrar listeleme.
-          - Açık ve kesin hatalara odaklan.
+          - Sadece açık ve kesin hatalara odaklan.
+          - Bir kelimenin birden fazla doğru kullanımı varsa
+            bunu hata olarak işaretleme.
 
-          Her hata için:
+          Her hata için şu formatı kullan:
 
-          HATA:
-          YANLIŞ:
-          DOĞRU:
-          NEDEN:
-          GÜVEN:
+          HATA 1
+          YANLIŞ: ...
+          DOĞRU: ...
+          NEDEN: ...
+          GÜVEN: Yüksek / Orta
 
-          formatını kullan.
+          HATA 2
+          YANLIŞ: ...
+          DOĞRU: ...
+          NEDEN: ...
+          GÜVEN: Yüksek / Orta
 
           Belirgin hata yoksa:
 
@@ -144,27 +167,69 @@ jobs:
 
           yaz.
 
-          BAŞLIK:
+          SAYFA BAŞLIĞI:
           {title}
 
           URL:
           {URL}
 
-          METİN:
+          SAYFA METNİ:
           {text}
           """
 
           print("")
-          print("Gemini analiz ediyor...")
+          print("Gemini analizine başlanıyor...")
+          print("")
 
           client = genai.Client(
               api_key=api_key
           )
 
-          response = client.models.generate_content(
-              model="gemini-3.6-flash",
-              contents=prompt
-          )
+          response = None
+          retry_delay = 5
+
+          for attempt in range(1, 5):
+
+              try:
+
+                  print(
+                      f"Gemini denemesi {attempt}/4"
+                  )
+
+                  response = client.models.generate_content(
+                      model="gemini-3.6-flash",
+                      contents=prompt
+                  )
+
+                  print("Gemini başarılı.")
+                  break
+
+              except Exception as error:
+
+                  print("")
+                  print("Gemini hatası:")
+                  print(error)
+                  print("")
+
+                  if attempt == 4:
+                      print(
+                          "4 denemenin tamamı başarısız oldu."
+                      )
+                      raise
+
+                  print(
+                      f"{retry_delay} saniye sonra "
+                      "tekrar denenecek..."
+                  )
+
+                  time.sleep(retry_delay)
+
+                  retry_delay *= 2
+
+          if response is None:
+              raise RuntimeError(
+                  "Gemini'den cevap alınamadı."
+              )
 
           print("")
           print("======================================")
