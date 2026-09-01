@@ -1,10 +1,10 @@
-name: WebProof AI - BBC Yazım Denetimi
+name: WebProof AI - BBC Link Crawler
 
 on:
   workflow_dispatch:
 
 jobs:
-  spelling-test:
+  crawler-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,39 +16,28 @@ jobs:
       - name: Gerekli paketleri kur
         run: |
           python -m pip install --upgrade pip
-          pip install google-genai beautifulsoup4
+          pip install beautifulsoup4
 
-      - name: BBC Türkçe sayfasını analiz et
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: BBC Türkçe bağlantılarını bul
         run: |
-          cat > test.py <<'PY'
-          import os
-          import time
+          cat > crawler.py <<'PY'
           import urllib.request
+          from urllib.parse import urljoin, urlparse
           from bs4 import BeautifulSoup
-          from google import genai
 
-          URL = "https://www.bbc.com/turkce"
+          BASE_URL = "https://www.bbc.com/turkce"
 
           print("======================================")
           print("WEBPROOF AI")
-          print("BBC TÜRKÇE YAZIM DENETİMİ")
+          print("BBC TÜRKÇE LINK CRAWLER")
           print("======================================")
-          print("URL:", URL)
           print("")
-
-          api_key = os.environ.get("GEMINI_API_KEY")
-
-          if not api_key:
-              raise RuntimeError(
-                  "GEMINI_API_KEY bulunamadı."
-              )
-
-          print("BBC Türkçe indiriliyor...")
+          print("Ana sayfa:", BASE_URL)
+          print("")
+          print("BBC Türkçe ana sayfası indiriliyor...")
 
           request = urllib.request.Request(
-              URL,
+              BASE_URL,
               headers={
                   "User-Agent": "Mozilla/5.0"
               }
@@ -73,176 +62,115 @@ jobs:
               "html.parser"
           )
 
-          for tag in soup([
-              "script",
-              "style",
-              "noscript",
-              "svg",
-              "nav",
-              "footer",
-              "header",
-              "form"
-          ]):
-              tag.decompose()
+          links = []
 
-          title = ""
+          for a in soup.find_all("a", href=True):
 
-          if soup.title:
-              title = soup.title.get_text(
+              href = a.get("href")
+
+              if not href:
+                  continue
+
+              full_url = urljoin(
+                  BASE_URL,
+                  href
+              )
+
+              parsed = urlparse(full_url)
+
+              if parsed.netloc != "www.bbc.com":
+                  continue
+
+              if not parsed.path.startswith("/turkce"):
+                  continue
+
+              clean_url = (
+                  f"{parsed.scheme}://"
+                  f"{parsed.netloc}"
+                  f"{parsed.path}"
+              )
+
+              text = a.get_text(
                   " ",
                   strip=True
               )
 
-          main = soup.find("main")
-
-          if main:
-              text = main.get_text(
-                  " ",
-                  strip=True
-              )
-          else:
-              text = soup.get_text(
-                  " ",
-                  strip=True
+              text = " ".join(
+                  text.split()
               )
 
-          text = " ".join(
-              text.split()
-          )
+              if not text:
+                  continue
 
-          print("Sayfa başlığı:")
-          print(title)
+              if clean_url == BASE_URL:
+                  continue
+
+              if clean_url not in [
+                  item["url"] for item in links
+              ]:
+
+                  links.append({
+                      "url": clean_url,
+                      "text": text
+                  })
+
+          print("Toplam benzersiz BBC Türkçe bağlantısı:")
+          print(len(links))
           print("")
+
+          print("======================================")
+          print("BULUNAN BAĞLANTILAR")
+          print("======================================")
+          print("")
+
+          article_candidates = []
+
+          for item in links:
+
+              url = item["url"]
+              text = item["text"]
+
+              path = urlparse(url).path
+
+              article_words = [
+                  "/articles/",
+                  "/features/",
+                  "/turkce/haberler/"
+              ]
+
+              is_article = any(
+                  word in path
+                  for word in article_words
+              )
+
+              if is_article:
+
+                  article_candidates.append(item)
 
           print(
-              "Temiz metin karakter sayısı:",
-              len(text)
+              "Haber/makale adayı bağlantı sayısı:",
+              len(article_candidates)
           )
 
-          if len(text) < 100:
-              raise RuntimeError(
-                  "BBC sayfasından yeterli metin alınamadı."
-              )
-
-          text = text[:12000]
-
-          prompt = f"""
-          Sen WebProof AI'ın Türkçe yazım denetimi uzmanısın.
-
-          Aşağıdaki BBC Türkçe sayfasındaki metni incele.
-
-          SADECE şu hataları tespit et:
-
-          1. Yazım yanlışları
-          2. Noktalama yanlışları
-          3. Açık ve kesin dilbilgisi yanlışları
-
-          KURALLAR:
-
-          - Emin olmadığın ifadeyi hata olarak gösterme.
-          - Özel isimleri hata olarak gösterme.
-          - Haber üslubunu hata kabul etme.
-          - Aynı hatayı tekrar listeleme.
-          - Sadece açık ve kesin hatalara odaklan.
-          - Bir kelimenin birden fazla doğru kullanımı varsa
-            bunu hata olarak işaretleme.
-
-          Her hata için şu formatı kullan:
-
-          HATA 1
-          YANLIŞ: ...
-          DOĞRU: ...
-          NEDEN: ...
-          GÜVEN: Yüksek / Orta
-
-          HATA 2
-          YANLIŞ: ...
-          DOĞRU: ...
-          NEDEN: ...
-          GÜVEN: Yüksek / Orta
-
-          Belirgin hata yoksa:
-
-          BELİRGİN YAZIM HATASI BULUNAMADI
-
-          yaz.
-
-          SAYFA BAŞLIĞI:
-          {title}
-
-          URL:
-          {URL}
-
-          SAYFA METNİ:
-          {text}
-          """
-
-          print("")
-          print("Gemini analizine başlanıyor...")
           print("")
 
-          client = genai.Client(
-              api_key=api_key
-          )
+          selected = article_candidates[:10]
 
-          response = None
-          retry_delay = 5
+          for index, item in enumerate(
+              selected,
+              start=1
+          ):
 
-          for attempt in range(1, 5):
+              print("--------------------------------------")
+              print(f"HABER ADAYI {index}")
+              print("BAŞLIK:", item["text"])
+              print("URL:", item["url"])
+              print("--------------------------------------")
+              print("")
 
-              try:
-
-                  print(
-                      f"Gemini denemesi {attempt}/4"
-                  )
-
-                  response = client.models.generate_content(
-                      model="gemini-3.6-flash",
-                      contents=prompt
-                  )
-
-                  print("Gemini başarılı.")
-                  break
-
-              except Exception as error:
-
-                  print("")
-                  print("Gemini hatası:")
-                  print(error)
-                  print("")
-
-                  if attempt == 4:
-                      print(
-                          "4 denemenin tamamı başarısız oldu."
-                      )
-                      raise
-
-                  print(
-                      f"{retry_delay} saniye sonra "
-                      "tekrar denenecek..."
-                  )
-
-                  time.sleep(retry_delay)
-
-                  retry_delay *= 2
-
-          if response is None:
-              raise RuntimeError(
-                  "Gemini'den cevap alınamadı."
-              )
-
-          print("")
           print("======================================")
-          print("WEBPROOF AI SONUCU")
-          print("======================================")
-          print("")
-
-          print(response.text)
-
-          print("")
-          print("======================================")
-          print("TEST TAMAMLANDI")
+          print("CRAWLER TESTİ TAMAMLANDI")
           print("======================================")
           PY
 
-          python test.py
+          python crawler.py
