@@ -1,10 +1,10 @@
-name: WebProof AI Gemini Test
+name: WebProof AI - BBC Yazım Denetimi
 
 on:
   workflow_dispatch:
 
 jobs:
-  gemini-test:
+  spelling-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -13,33 +13,171 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Gemini kurulumu
+      - name: Gerekli paketleri kur
         run: |
           python -m pip install --upgrade pip
-          pip install google-genai
+          pip install google-genai beautifulsoup4
 
-      - name: Gemini bağlantısını test et
+      - name: BBC Türkçe sayfasını analiz et
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python - <<'PY'
+          cat > test.py <<'PY'
           import os
+          import urllib.request
+          from bs4 import BeautifulSoup
           from google import genai
+
+          URL = "https://www.bbc.com/turkce"
+
+          print("======================================")
+          print("WEBPROOF AI")
+          print("BBC TÜRKÇE YAZIM DENETİMİ")
+          print("======================================")
 
           api_key = os.environ.get("GEMINI_API_KEY")
 
           if not api_key:
               raise RuntimeError("GEMINI_API_KEY bulunamadı.")
 
-          client = genai.Client(api_key=api_key)
+          print("BBC Türkçe indiriliyor...")
+
+          request = urllib.request.Request(
+              URL,
+              headers={
+                  "User-Agent": "Mozilla/5.0"
+              }
+          )
+
+          with urllib.request.urlopen(
+              request,
+              timeout=30
+          ) as response:
+              html = response.read().decode(
+                  "utf-8",
+                  errors="ignore"
+              )
+
+          print("HTTP:", response.status)
+          print("HTML karakter sayısı:", len(html))
+
+          soup = BeautifulSoup(
+              html,
+              "html.parser"
+          )
+
+          for tag in soup([
+              "script",
+              "style",
+              "noscript",
+              "svg"
+          ]):
+              tag.decompose()
+
+          title = ""
+
+          if soup.title:
+              title = soup.title.get_text(
+                  " ",
+                  strip=True
+              )
+
+          main = soup.find("main")
+
+          if main:
+              text = main.get_text(
+                  " ",
+                  strip=True
+              )
+          else:
+              text = soup.get_text(
+                  " ",
+                  strip=True
+              )
+
+          text = " ".join(text.split())
+
+          print("Başlık:", title)
+          print("Metin karakter sayısı:", len(text))
+
+          if len(text) < 100:
+              raise RuntimeError(
+                  "BBC sayfasından yeterli metin alınamadı."
+              )
+
+          text = text[:12000]
+
+          prompt = f"""
+          Sen WebProof AI'ın Türkçe yazım denetimi uzmanısın.
+
+          Aşağıdaki BBC Türkçe sayfasındaki metni kontrol et.
+
+          SADECE:
+
+          1. Yazım yanlışları
+          2. Noktalama yanlışları
+          3. Açık dilbilgisi yanlışları
+
+          bul.
+
+          Kurallar:
+
+          - Emin olmadığın ifadeyi hata olarak gösterme.
+          - Özel isimleri hata olarak gösterme.
+          - Haber üslubunu hata kabul etme.
+          - Aynı hatayı tekrar listeleme.
+          - Açık ve kesin hatalara odaklan.
+
+          Her hata için:
+
+          HATA:
+          YANLIŞ:
+          DOĞRU:
+          NEDEN:
+          GÜVEN:
+
+          formatını kullan.
+
+          Belirgin hata yoksa:
+
+          BELİRGİN YAZIM HATASI BULUNAMADI
+
+          yaz.
+
+          BAŞLIK:
+          {title}
+
+          URL:
+          {URL}
+
+          METİN:
+          {text}
+          """
+
+          print("")
+          print("Gemini analiz ediyor...")
+
+          client = genai.Client(
+              api_key=api_key
+          )
 
           response = client.models.generate_content(
               model="gemini-3.6-flash",
-              contents="WebProof AI çalışıyor. Sadece 'BAŞARILI' yaz."
+              contents=prompt
           )
 
-          print("================================")
-          print("GEMINI SONUCU")
-          print("================================")
+          print("")
+          print("======================================")
+          print("WEBPROOF AI SONUCU")
+          print("======================================")
+          print("")
+
           print(response.text)
+
+          print("")
+          print("======================================")
+          print("TEST TAMAMLANDI")
+          print("======================================")
           PY
+
+          python test.py
