@@ -8,15 +8,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Python
+      - name: Repository indir
+        uses: actions/checkout@v4
+
+      - name: Python kurulumu
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
-      - name: Install
+      - name: Kütüphaneleri kur
         run: pip install openai requests beautifulsoup4
 
-      - name: Run
+      - name: NVIDIA testi
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: python nvidia_test.py
