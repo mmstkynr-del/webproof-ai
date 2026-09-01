@@ -18,253 +18,85 @@ jobs:
           python -m pip install --upgrade pip
           pip install beautifulsoup4 requests
 
-      - name: BBC + NVIDIA yazım denetimi
+      - name: NVIDIA test
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
-          python - <<'PY'
+          cat > test_nvidia.py <<'PYTHON'
           import os
-          import re
           import requests
-          from bs4 import BeautifulSoup
-          from urllib.parse import urljoin, urlparse
-
-          BASE_URL = "https://www.bbc.com/turkce"
-
-          # NVIDIA'daki güçlü genel amaçlı model
-          MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1"
 
           API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+          MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1"
 
-          headers = {
-              "User-Agent": "Mozilla/5.0"
+          api_key = os.environ["NVIDIA_API_KEY"]
+
+          print("========================================")
+          print("WEBPROOF AI - NVIDIA API TEST")
+          print("========================================")
+
+          payload = {
+              "model": MODEL,
+              "messages": [
+                  {
+                      "role": "system",
+                      "content": "Sen profesyonel bir Türkçe haber editörüsün."
+                  },
+                  {
+                      "role": "user",
+                      "content": """
+                      Aşağıdaki cümlede yalnızca açık yazım,
+                      noktalama veya dilbilgisi hatalarını bul.
+
+                      Cümle:
+                      "Türkiye Avrupa Voleybol Şampiyonasında Azerbaycanı eleyerek çeyrek finale çıktı."
+
+                      Şu formatı kullan:
+
+                      Orijinal:
+                      Öneri:
+                      Açıklama:
+                      """
+                  }
+              ],
+              "temperature": 0.1,
+              "max_tokens": 500,
+              "stream": False
           }
 
-          print("========================================")
-          print("WEBPROOF AI")
-          print("NVIDIA TESTİ")
-          print("========================================")
+          headers = {
+              "Authorization": f"Bearer {api_key}",
+              "Content-Type": "application/json"
+          }
 
-          # ----------------------------------------
-          # 1. BBC ana sayfası
-          # ----------------------------------------
-
-          response = requests.get(
-              BASE_URL,
-              headers=headers,
-              timeout=15
-          )
-
-          print(f"BBC HTTP: {response.status_code}")
-
-          soup = BeautifulSoup(response.text, "html.parser")
-
-          # ----------------------------------------
-          # 2. Haber bağlantıları
-          # ----------------------------------------
-
-          article_urls = []
-
-          for a in soup.find_all("a", href=True):
-
-              href = urljoin(BASE_URL, a["href"])
-              parsed = urlparse(href)
-
-              if parsed.netloc not in ["www.bbc.com", "bbc.com"]:
-                  continue
-
-              if parsed.path.startswith("/turkce/articles/"):
-
-                  clean_url = f"https://www.bbc.com{parsed.path}"
-
-                  if clean_url not in article_urls:
-                      article_urls.append(clean_url)
-
-          print(f"Bulunan haber bağlantısı: {len(article_urls)}")
-
-          article_urls = article_urls[:5]
-
-          # ----------------------------------------
-          # 3. Haber metni çıkarma
-          # ----------------------------------------
-
-          def extract_article(url):
-
-              r = requests.get(
-                  url,
+          try:
+              response = requests.post(
+                  API_URL,
                   headers=headers,
-                  timeout=15
+                  json=payload,
+                  timeout=120
               )
 
-              if r.status_code != 200:
-                  print(f"HTTP hata: {r.status_code}")
-                  return None
-
-              soup = BeautifulSoup(r.text, "html.parser")
-
-              for tag in soup([
-                  "script",
-                  "style",
-                  "noscript",
-                  "svg",
-                  "nav",
-                  "footer",
-                  "header",
-                  "form",
-                  "aside",
-                  "iframe"
-              ]):
-                  tag.decompose()
-
-              main = soup.find("main")
-
-              if not main:
-                  main = soup.body
-
-              if not main:
-                  return None
-
-              paragraphs = []
-
-              for p in main.find_all("p"):
-
-                  text = p.get_text(" ", strip=True)
-                  text = re.sub(r"\s+", " ", text)
-
-                  if len(text) >= 25:
-
-                      if text not in paragraphs:
-                          paragraphs.append(text)
-
-              return "\n\n".join(paragraphs)[:12000]
-
-          # ----------------------------------------
-          # 4. NVIDIA analizi
-          # ----------------------------------------
-
-          successful = 0
-
-          for index, url in enumerate(article_urls, 1):
-
+              print(f"NVIDIA HTTP: {response.status_code}")
               print()
-              print("========================================")
-              print(f"HABER {index}/{len(article_urls)}")
-              print(url)
-              print("========================================")
 
-              text = extract_article(url)
-
-              if not text:
-                  print("Metin alınamadı.")
-                  continue
-
-              print(f"Metin uzunluğu: {len(text)} karakter")
-
-              prompt = f"""
-Sen profesyonel bir Türkçe haber editörüsün.
-
-Aşağıdaki haber metnini yalnızca şu konularda kontrol et:
-
-- yazım hataları
-- noktalama hataları
-- açık dilbilgisi hataları
-- kelime içindeki bariz harf hataları
-- bariz boşluk hataları
-
-ÖNEMLİ:
-
-Siyasi, hukuki, ekonomik veya haber dilini gereksiz yere değiştirme.
-
-Özel isimleri değiştirme.
-
-Kurum ve kuruluş isimlerini değiştirme.
-
-Kişi isimlerini değiştirme.
-
-Anlamı değiştirme.
-
-Emin olmadığın ifadeyi hata olarak gösterme.
-
-Yalnızca açıkça hatalı olduğundan emin olduğun noktaları bildir.
-
-Format:
-
-HATA:
-Orijinal: ...
-Öneri: ...
-Açıklama: ...
-
-Hiç hata yoksa:
-
-HATA YOK
-
-HABER:
-
-{text}
-"""
-
-              payload = {
-                  "model": MODEL,
-                  "messages": [
-                      {
-                          "role": "system",
-                          "content": "Sen profesyonel Türkçe haber editörüsün."
-                      },
-                      {
-                          "role": "user",
-                          "content": prompt
-                      }
-                  ],
-                  "temperature": 0.1,
-                  "max_tokens": 2000,
-                  "stream": False
-              }
-
-              try:
-
-                  result = requests.post(
-                      API_URL,
-                      headers={
-                          "Authorization": f"Bearer {os.environ['NVIDIA_API_KEY']}",
-                          "Content-Type": "application/json"
-                      },
-                      json=payload,
-                      timeout=120
-                  )
-
-                  print(f"NVIDIA HTTP: {result.status_code}")
-
-                  if result.status_code != 200:
-
-                      print("NVIDIA API HATASI:")
-                      print(result.text[:3000])
-
-                      continue
-
-                  data = result.json()
-
+              if response.status_code == 200:
+                  data = response.json()
                   answer = data["choices"][0]["message"]["content"]
 
-                  successful += 1
-
-                  print()
-                  print("NVIDIA SONUCU:")
+                  print("NVIDIA BAŞARILI")
+                  print("========================================")
                   print(answer)
 
-              except Exception as e:
+              else:
+                  print("NVIDIA API HATASI")
+                  print("========================================")
+                  print(response.text)
 
-                  print("Bağlantı hatası:")
-                  print(str(e))
+          except Exception as e:
+              print("BAĞLANTI HATASI")
+              print(str(e))
+              raise
+          PYTHON
 
-          # ----------------------------------------
-          # 5. Sonuç
-          # ----------------------------------------
-
-          print()
-          print("========================================")
-          print("NVIDIA TEST SONUCU")
-          print("========================================")
-          print(f"Başarılı analiz: {successful}")
-          print(f"Toplam haber: {len(article_urls)}")
-          print("========================================")
-          PY
+          python test_nvidia.py
