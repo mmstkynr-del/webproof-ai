@@ -1,10 +1,45 @@
-name: WebProof AI BBC Gemini Test
+name: WebProof AI Gemini Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  gemini-test:
     runs-on: ubuntu-latest
+
     steps:
-      - run: echo "WEBPROOF AI TEST CALISIYOR"
+      - name: Python kurulumu
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Gemini kurulumu
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-genai
+
+      - name: Gemini bağlantısını test et
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python - <<'PY'
+          import os
+          from google import genai
+
+          api_key = os.environ.get("GEMINI_API_KEY")
+
+          if not api_key:
+              raise RuntimeError("GEMINI_API_KEY bulunamadı.")
+
+          client = genai.Client(api_key=api_key)
+
+          response = client.models.generate_content(
+              model="gemini-3.6-flash",
+              contents="WebProof AI çalışıyor. Sadece 'BAŞARILI' yaz."
+          )
+
+          print("================================")
+          print("GEMINI SONUCU")
+          print("================================")
+          print(response.text)
+          PY
