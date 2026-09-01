@@ -14,8 +14,8 @@ const HTML = `
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: Arial, sans-serif;
-  color: white;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #fff;
   background:
     radial-gradient(circle at 10% 10%, #18345c, transparent 35%),
     radial-gradient(circle at 90% 90%, #17213d, transparent 35%),
@@ -116,6 +116,7 @@ input {
 
 input:focus {
   border-color: #00c8ff;
+  box-shadow: 0 0 0 3px rgba(0,200,255,.08);
 }
 
 button {
@@ -226,6 +227,7 @@ button:disabled {
 }
 
 @media (max-width: 700px) {
+
   .container {
     padding-top: 40px;
   }
@@ -245,6 +247,7 @@ button:disabled {
   .stats {
     grid-template-columns: repeat(2, 1fr);
   }
+
 }
 </style>
 </head>
@@ -349,7 +352,8 @@ const totalCharacters = document.getElementById("totalCharacters");
 const readyForAI = document.getElementById("readyForAI");
 const pageList = document.getElementById("pageList");
 
-function status(message, type) {
+function setStatus(message, type) {
+
   statusBox.textContent = message;
   statusBox.className = "status";
 
@@ -360,85 +364,118 @@ function status(message, type) {
   if (type === "success") {
     statusBox.classList.add("success");
   }
+
 }
 
-function number(value) {
+function formatNumber(value) {
   return Number(value || 0).toLocaleString("tr-TR");
 }
 
-function showResults(data) {
+function displayResults(data) {
 
   results.classList.add("show");
 
-  pagesScanned.textContent = number(data.pagesScanned);
-  linksFound.textContent = number(data.linksFound);
-  totalCharacters.textContent = number(data.totalCharacters);
-  readyForAI.textContent = number(data.readyForAI);
+  pagesScanned.textContent =
+    formatNumber(data.pagesScanned);
+
+  linksFound.textContent =
+    formatNumber(data.linksFound);
+
+  totalCharacters.textContent =
+    formatNumber(data.totalCharacters);
+
+  readyForAI.textContent =
+    formatNumber(data.readyForAI);
 
   pageList.innerHTML = "";
 
   if (!data.pages || data.pages.length === 0) {
 
-    pageList.textContent = "Taranabilir sayfa bulunamadı.";
+    pageList.textContent =
+      "Taranabilir sayfa bulunamadı.";
 
     return;
+
   }
 
   data.pages.forEach(function(page) {
 
-    const box = document.createElement("div");
+    const box =
+      document.createElement("div");
+
     box.className = "page";
 
-    const url = document.createElement("div");
-    url.className = "page-url";
-    url.textContent = page.url;
+    const pageUrl =
+      document.createElement("div");
 
-    const info = document.createElement("div");
+    pageUrl.className = "page-url";
+
+    pageUrl.textContent =
+      page.url;
+
+    const info =
+      document.createElement("div");
+
     info.className = "page-info";
 
     info.textContent =
       "HTTP " +
       page.status +
       " · " +
-      number(page.characters) +
+      formatNumber(page.characters) +
       " karakter";
 
-    box.appendChild(url);
+    box.appendChild(pageUrl);
     box.appendChild(info);
 
     pageList.appendChild(box);
 
   });
+
 }
 
-async function scan() {
+async function scanSite() {
 
-  const target = input.value.trim();
+  const target =
+    input.value.trim();
 
   if (!target) {
-    status("Lütfen bir web sitesi adresi girin.", "error");
+
+    setStatus(
+      "Lütfen bir web sitesi adresi girin.",
+      "error"
+    );
+
     return;
+
   }
 
   try {
 
-    const parsed = new URL(target);
+    const parsed =
+      new URL(target);
 
     if (
       parsed.protocol !== "http:" &&
       parsed.protocol !== "https:"
     ) {
-      throw new Error("Sadece HTTP veya HTTPS kullanılabilir.");
+
+      throw new Error(
+        "Sadece HTTP veya HTTPS adresleri kullanılabilir."
+      );
+
     }
 
   } catch (error) {
 
-    status(
-      error.message || "Geçerli bir URL girin.",
+    setStatus(
+      error.message ||
+      "Geçerli bir URL girin.",
       "error"
     );
 
     return;
+
   }
 
   button.disabled = true;
@@ -446,41 +483,53 @@ async function scan() {
 
   results.classList.remove("show");
 
-  status(
-    "Web sitesi taranıyor. Lütfen bekleyin...",
+  setStatus(
+    "Web sitesi taranıyor. Sayfalar ve bağlantılar bulunuyor...",
     null
   );
 
   try {
 
-    const response = await fetch("/api/scan", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        url: target
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(
-        data.error || "Tarama başarısız."
+    const response =
+      await fetch(
+        "/api/scan",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body: JSON.stringify({
+            url: target
+          })
+        }
       );
+
+    const data =
+      await response.json();
+
+    if (
+      !response.ok ||
+      !data.success
+    ) {
+
+      throw new Error(
+        data.error ||
+        "Tarama başarısız."
+      );
+
     }
 
-    showResults(data);
+    displayResults(data);
 
-    status(
+    setStatus(
       "Tarama tamamlandı. Bulunan içerikler AI analizine hazır.",
       "success"
     );
 
   } catch (error) {
 
-    status(
+    setStatus(
       "Hata: " + error.message,
       "error"
     );
@@ -489,17 +538,24 @@ async function scan() {
 
   button.disabled = false;
   button.textContent = "SİTEYİ TARA";
+
 }
 
-button.addEventListener("click", scan);
+button.addEventListener(
+  "click",
+  scanSite
+);
 
-input.addEventListener("keydown", function(event) {
+input.addEventListener(
+  "keydown",
+  function(event) {
 
-  if (event.key === "Enter") {
-    scan();
+    if (event.key === "Enter") {
+      scanSite();
+    }
+
   }
-
-});
+);
 
 </script>
 
@@ -507,14 +563,15 @@ input.addEventListener("keydown", function(event) {
 </html>
 `;
 
-function json(data, statusCode) {
+function jsonResponse(data, statusCode) {
 
   return new Response(
     JSON.stringify(data, null, 2),
     {
       status: statusCode || 200,
       headers: {
-        "Content-Type": "application/json; charset=UTF-8",
+        "Content-Type":
+          "application/json; charset=UTF-8",
         "Access-Control-Allow-Origin": "*"
       }
     }
@@ -522,22 +579,23 @@ function json(data, statusCode) {
 
 }
 
-function normalize(url) {
+function normalizeUrl(url) {
 
   try {
 
-    const u = new URL(url);
+    const parsed =
+      new URL(url);
 
     if (
-      u.protocol !== "http:" &&
-      u.protocol !== "https:"
+      parsed.protocol !== "http:" &&
+      parsed.protocol !== "https:"
     ) {
       return null;
     }
 
-    u.hash = "";
+    parsed.hash = "";
 
-    return u.href;
+    return parsed.href;
 
   } catch {
 
@@ -547,11 +605,12 @@ function normalize(url) {
 
 }
 
-function blocked(host) {
+function isBlockedHost(hostname) {
 
-  const h = host.toLowerCase();
+  const host =
+    hostname.toLowerCase();
 
-  const bad = [
+  const blockedHosts = [
     "localhost",
     "127.0.0.1",
     "0.0.0.0",
@@ -561,19 +620,21 @@ function blocked(host) {
     "169.254.169.254"
   ];
 
-  if (bad.includes(h)) {
+  if (
+    blockedHosts.includes(host)
+  ) {
     return true;
   }
 
-  if (h.startsWith("10.")) {
+  if (host.startsWith("10.")) {
     return true;
   }
 
-  if (h.startsWith("192.168.")) {
+  if (host.startsWith("192.168.")) {
     return true;
   }
 
-  if (h.startsWith("127.")) {
+  if (host.startsWith("127.")) {
     return true;
   }
 
@@ -581,11 +642,12 @@ function blocked(host) {
 
 }
 
-function skip(url) {
+function shouldSkipUrl(url) {
 
-  const u = url.toLowerCase();
+  const lower =
+    url.toLowerCase();
 
-  const endings = [
+  const extensions = [
     ".jpg",
     ".jpeg",
     ".png",
@@ -596,6 +658,7 @@ function skip(url) {
     ".pdf",
     ".zip",
     ".rar",
+    ".7z",
     ".mp3",
     ".mp4",
     ".avi",
@@ -607,12 +670,17 @@ function skip(url) {
     ".json",
     ".woff",
     ".woff2",
-    ".ttf"
+    ".ttf",
+    ".eot"
   ];
 
-  for (const ending of endings) {
+  for (
+    const extension of extensions
+  ) {
 
-    if (u.includes(ending)) {
+    if (
+      lower.includes(extension)
+    ) {
       return true;
     }
 
@@ -622,73 +690,177 @@ function skip(url) {
 
 }
 
-function cleanText(html) {
+function decodeBasicEntities(text) {
 
-  let text = html;
+  return text
+    .split("&nbsp;").join(" ")
+    .split("&amp;").join("&")
+    .split("&quot;").join('"')
+    .split("&#39;").join("'")
+    .split("&lt;").join("<")
+    .split("&gt;").join(">");
 
-  const patterns = [
-    new RegExp("<script[\\\\s\\\\S]*?<\\\\/script>", "gi"),
-    new RegExp("<style[\\\\s\\\\S]*?<\\\\/style>", "gi"),
-    new RegExp("<noscript[\\\\s\\\\S]*?<\\\\/noscript>", "gi"),
-    new RegExp("<svg[\\\\s\\\\S]*?<\\\\/svg>", "gi"),
-    new RegExp("<nav[\\\\s\\\\S]*?<\\\\/nav>", "gi"),
-    new RegExp("<footer[\\\\s\\\\S]*?<\\\\/footer>", "gi"),
-    new RegExp("<header[\\\\s\\\\S]*?<\\\\/header>", "gi")
-  ];
+}
 
-  for (const pattern of patterns) {
-    text = text.replace(pattern, " ");
+function extractText(html) {
+
+  let text =
+    html;
+
+  text =
+    text.replace(
+      /<script[\s\S]*?<\/script>/gi,
+      " "
+    );
+
+  text =
+    text.replace(
+      /<style[\s\S]*?<\/style>/gi,
+      " "
+    );
+
+  text =
+    text.replace(
+      /<noscript[\s\S]*?<\/noscript>/gi,
+      " "
+    );
+
+  text =
+    text.replace(
+      /<svg[\s\S]*?<\/svg>/gi,
+      " "
+    );
+
+  text =
+    text.replace(
+      /<nav[\s\S]*?<\/nav>/gi,
+      " "
+    );
+
+  text =
+    text.replace(
+      /<footer[\s\S]*?<\/footer>/gi,
+      " "
+    );
+
+  text =
+    text.replace(
+      /<header[\s\S]*?<\/header>/gi,
+      " "
+    );
+
+  const paragraphs = [];
+
+  const paragraphPattern =
+    /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+
+  let match;
+
+  while (
+    (match =
+      paragraphPattern.exec(text)) !== null
+  ) {
+
+    let paragraph =
+      match[1];
+
+    paragraph =
+      paragraph.replace(
+        /<[^>]+>/g,
+        " "
+      );
+
+    paragraph =
+      decodeBasicEntities(
+        paragraph
+      );
+
+    paragraph =
+      paragraph.replace(
+        /\s+/g,
+        " "
+      );
+
+    paragraph =
+      paragraph.trim();
+
+    if (
+      paragraph.length >= 40
+    ) {
+
+      paragraphs.push(
+        paragraph
+      );
+
+    }
+
   }
 
-  text = text.replace(
-    new RegExp("<p\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/p>", "gi"),
-    " $1 "
-  );
+  if (
+    paragraphs.length > 0
+  ) {
 
-  text = text.replace(
-    new RegExp("<[^>]+>", "g"),
-    " "
-  );
+    return paragraphs.join(
+      "\n\n"
+    );
 
-  text = text.split("&nbsp;").join(" ");
-  text = text.split("&amp;").join("&");
-  text = text.split("&quot;").join('"');
-  text = text.split("&#39;").join("'");
+  }
 
-  text = text.replace(
-    new RegExp("\\\\s+", "g"),
-    " "
-  );
+  text =
+    text.replace(
+      /<[^>]+>/g,
+      " "
+    );
+
+  text =
+    decodeBasicEntities(
+      text
+    );
+
+  text =
+    text.replace(
+      /\s+/g,
+      " "
+    );
 
   return text.trim();
 
 }
 
-function findLinks(html, baseUrl, domain) {
+function extractLinks(
+  html,
+  baseUrl,
+  domain
+) {
 
-  const found = new Set();
+  const found =
+    new Set();
 
-  const pattern =
-    new RegExp(
-      "<a\\\\b[^>]*href\\\\s*=\\\\s*[\\\"']([^\\\"']+)[\\\"'][^>]*>",
-      "gi"
-    );
+  const linkPattern =
+    /<a[^>]+href\s*=\s*["']([^"']+)["'][^>]*>/gi;
 
   let match;
 
-  while ((match = pattern.exec(html)) !== null) {
+  while (
+    (match =
+      linkPattern.exec(html)) !== null
+  ) {
 
-    const raw = match[1];
+    const raw =
+      match[1];
 
     if (!raw) {
       continue;
     }
 
+    const cleanRaw =
+      raw.trim();
+
     if (
-      raw.startsWith("#") ||
-      raw.startsWith("mailto:") ||
-      raw.startsWith("tel:") ||
-      raw.startsWith("javascript:")
+      cleanRaw.startsWith("#") ||
+      cleanRaw.startsWith("mailto:") ||
+      cleanRaw.startsWith("tel:") ||
+      cleanRaw.startsWith("javascript:")
     ) {
       continue;
     }
@@ -696,7 +868,10 @@ function findLinks(html, baseUrl, domain) {
     try {
 
       const absolute =
-        new URL(raw, baseUrl);
+        new URL(
+          cleanRaw,
+          baseUrl
+        );
 
       absolute.hash = "";
 
@@ -708,23 +883,32 @@ function findLinks(html, baseUrl, domain) {
       }
 
       if (
-        absolute.hostname.toLowerCase() !== domain
+        absolute.hostname.toLowerCase() !==
+        domain
       ) {
         continue;
       }
 
       const normalized =
-        normalize(absolute.href);
+        normalizeUrl(
+          absolute.href
+        );
 
       if (!normalized) {
         continue;
       }
 
-      if (skip(normalized)) {
+      if (
+        shouldSkipUrl(
+          normalized
+        )
+      ) {
         continue;
       }
 
-      found.add(normalized);
+      found.add(
+        normalized
+      );
 
     } catch {
 
@@ -738,29 +922,37 @@ function findLinks(html, baseUrl, domain) {
 
 }
 
-async function download(url) {
+async function fetchPage(url) {
 
   try {
 
-    const response = await fetch(
-      url,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (compatible; WebProofAI/1.0)"
-        },
-        redirect: "follow"
-      }
-    );
+    const response =
+      await fetch(
+        url,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (compatible; WebProofAI/1.0)"
+          },
+          redirect: "follow"
+        }
+      );
 
     const contentType =
-      response.headers.get("content-type") || "";
+      response.headers.get(
+        "content-type"
+      ) || "";
 
-    if (!contentType.includes("text/html")) {
+    if (
+      !contentType.includes(
+        "text/html"
+      )
+    ) {
 
       return {
         url,
-        status: response.status,
+        status:
+          response.status,
         html: "",
         text: "",
         links: []
@@ -772,14 +964,20 @@ async function download(url) {
       await response.text();
 
     const finalUrl =
-      normalize(response.url) || url;
+      normalizeUrl(
+        response.url
+      ) || url;
 
     const text =
-      cleanText(html);
+      extractText(
+        html
+      );
 
     return {
-      url: finalUrl,
-      status: response.status,
+      url:
+        finalUrl,
+      status:
+        response.status,
       html,
       text,
       links: []
@@ -793,91 +991,135 @@ async function download(url) {
       html: "",
       text: "",
       links: [],
-      error: error.message
+      error:
+        error.message
     };
 
   }
 
 }
 
-async function crawl(startUrl) {
+async function crawlWebsite(
+  startUrl
+) {
 
-  const start =
-    normalize(startUrl);
+  const normalizedStart =
+    normalizeUrl(
+      startUrl
+    );
 
-  if (!start) {
-    throw new Error("Geçersiz URL.");
+  if (!normalizedStart) {
+
+    throw new Error(
+      "Geçersiz URL."
+    );
+
   }
 
-  const startObject =
-    new URL(start);
+  const start =
+    new URL(
+      normalizedStart
+    );
 
-  if (blocked(startObject.hostname)) {
+  if (
+    isBlockedHost(
+      start.hostname
+    )
+  ) {
+
     throw new Error(
       "Bu adres güvenlik nedeniyle taranamıyor."
     );
+
   }
 
   const domain =
-    startObject.hostname.toLowerCase();
+    start.hostname.toLowerCase();
 
   const MAX_PAGES = 10;
 
-  const queue = [start];
+  const queue = [
+    normalizedStart
+  ];
 
-  const visited = new Set();
+  const visited =
+    new Set();
 
   const pages = [];
 
-  let totalCharacters = 0;
   let linksFound = 0;
+
+  let totalCharacters = 0;
 
   while (
     queue.length > 0 &&
     pages.length < MAX_PAGES
   ) {
 
-    const current =
+    const currentUrl =
       queue.shift();
 
-    if (visited.has(current)) {
+    if (
+      visited.has(
+        currentUrl
+      )
+    ) {
       continue;
     }
 
-    visited.add(current);
+    visited.add(
+      currentUrl
+    );
 
     const page =
-      await download(current);
+      await fetchPage(
+        currentUrl
+      );
 
-    if (page.status === 0) {
+    if (
+      page.status === 0
+    ) {
       continue;
     }
 
     const links =
-      findLinks(
+      extractLinks(
         page.html,
         page.url,
         domain
       );
 
-    linksFound += links.length;
+    page.links =
+      links;
 
-    totalCharacters += page.text.length;
+    linksFound +=
+      links.length;
+
+    totalCharacters +=
+      page.text.length;
 
     pages.push({
-      url: page.url,
-      status: page.status,
-      characters: page.text.length
+      url:
+        page.url,
+      status:
+        page.status,
+      characters:
+        page.text.length
     });
 
-    for (const link of links) {
+    for (
+      const link of links
+    ) {
 
       if (
         !visited.has(link) &&
-        !queue.includes(link)
+        !queue.includes(link) &&
+        queue.length < 100
       ) {
 
-        queue.push(link);
+        queue.push(
+          link
+        );
 
       }
 
@@ -887,15 +1129,21 @@ async function crawl(startUrl) {
 
   return {
     success: true,
-    target: start,
+    target:
+      normalizedStart,
     domain,
-    pagesScanned: pages.length,
-    pagesLimit: MAX_PAGES,
+    pagesScanned:
+      pages.length,
+    pagesLimit:
+      MAX_PAGES,
     linksFound,
     totalCharacters,
-    readyForAI: pages.filter(function(page) {
-      return page.characters > 0;
-    }).length,
+    readyForAI:
+      pages.filter(
+        function(page) {
+          return page.characters > 0;
+        }
+      ).length,
     pages
   };
 
@@ -906,35 +1154,51 @@ export default {
   async fetch(request) {
 
     const url =
-      new URL(request.url);
+      new URL(
+        request.url
+      );
 
-    if (request.method === "OPTIONS") {
+    if (
+      request.method === "OPTIONS"
+    ) {
 
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods":
-            "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers":
-            "Content-Type"
+      return new Response(
+        null,
+        {
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin":
+              "*",
+            "Access-Control-Allow-Methods":
+              "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers":
+              "Content-Type"
+          }
         }
-      });
+      );
 
     }
 
-    if (url.pathname === "/api/status") {
+    if (
+      url.pathname ===
+      "/api/status"
+    ) {
 
-      return json({
+      return jsonResponse({
         success: true,
-        project: "WebProof AI",
-        status: "online"
+        project:
+          "WebProof AI",
+        status:
+          "online",
+        message:
+          "WebProof AI çalışıyor!"
       });
 
     }
 
     if (
-      url.pathname === "/api/scan" &&
+      url.pathname ===
+      "/api/scan" &&
       request.method === "POST"
     ) {
 
@@ -945,13 +1209,15 @@ export default {
 
         if (
           !body ||
-          typeof body.url !== "string"
+          typeof body.url !==
+          "string"
         ) {
 
-          return json(
+          return jsonResponse(
             {
               success: false,
-              error: "URL gönderilmedi."
+              error:
+                "URL gönderilmedi."
             },
             400
           );
@@ -959,13 +1225,17 @@ export default {
         }
 
         const result =
-          await crawl(body.url.trim());
+          await crawlWebsite(
+            body.url.trim()
+          );
 
-        return json(result);
+        return jsonResponse(
+          result
+        );
 
       } catch (error) {
 
-        return json(
+        return jsonResponse(
           {
             success: false,
             error:
@@ -979,7 +1249,9 @@ export default {
 
     }
 
-    if (url.pathname === "/") {
+    if (
+      url.pathname === "/"
+    ) {
 
       return new Response(
         HTML,
@@ -987,17 +1259,20 @@ export default {
           status: 200,
           headers: {
             "Content-Type":
-              "text/html; charset=UTF-8"
+              "text/html; charset=UTF-8",
+            "Cache-Control":
+              "no-cache"
           }
         }
       );
 
     }
 
-    return json(
+    return jsonResponse(
       {
         success: false,
-        error: "Endpoint bulunamadı."
+        error:
+          "Endpoint bulunamadı."
       },
       404
     );
