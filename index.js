@@ -1,966 +1,248 @@
-export default {
-  async fetch(request) {
-
-    const url = new URL(request.url);
-
-    // ======================================================
-    // CORS
-    // ======================================================
-
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    };
-
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders
-      });
-    }
-
-
-    // ======================================================
-    // API STATUS
-    // ======================================================
-
-    if (
-      url.pathname === "/api/status"
-    ) {
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          project: "WebProof AI",
-          status: "online",
-          engine: "Crawler",
-          message: "WebProof AI crawler hazır."
-        }, null, 2),
-        {
-          status: 200,
-          headers: {
-            "Content-Type":
-              "application/json; charset=UTF-8",
-            ...corsHeaders
-          }
-        }
-      );
-    }
-
-
-    // ======================================================
-    // API SCAN
-    // ======================================================
-
-    if (
-      url.pathname === "/api/scan" &&
-      request.method === "POST"
-    ) {
-
-      try {
-
-        const body = await request.json();
-
-        const targetUrl =
-          typeof body.url === "string"
-            ? body.url.trim()
-            : "";
-
-        if (!targetUrl) {
-
-          return jsonResponse(
-            {
-              success: false,
-              error:
-                "Lütfen bir web sitesi adresi girin."
-            },
-            400,
-            corsHeaders
-          );
-        }
-
-
-        // ==================================================
-        // URL KONTROLÜ
-        // ==================================================
-
-        let parsed;
-
-        try {
-
-          parsed = new URL(
-            targetUrl
-          );
-
-        } catch {
-
-          return jsonResponse(
-            {
-              success: false,
-              error:
-                "Geçerli bir URL girin."
-            },
-            400,
-            corsHeaders
-          );
-        }
-
-
-        if (
-          parsed.protocol !== "https:" &&
-          parsed.protocol !== "http:"
-        ) {
-
-          return jsonResponse(
-            {
-              success: false,
-              error:
-                "Sadece HTTP ve HTTPS adresleri destekleniyor."
-            },
-            400,
-            corsHeaders
-          );
-        }
-
-
-        // ==================================================
-        // TEHLİKELİ / YEREL ADRES KONTROLÜ
-        // ==================================================
-
-        const hostname =
-          parsed.hostname.toLowerCase();
-
-        const blockedHosts = [
-          "localhost",
-          "127.0.0.1",
-          "0.0.0.0",
-          "::1",
-          "metadata.google.internal"
-        ];
-
-        if (
-          blockedHosts.includes(
-            hostname
-          )
-        ) {
-
-          return jsonResponse(
-            {
-              success: false,
-              error:
-                "Bu adres güvenlik nedeniyle taranamıyor."
-            },
-            403,
-            corsHeaders
-          );
-        }
-
-
-        // ==================================================
-        // CRAWLER AYARLARI
-        // ==================================================
-
-        const MAX_PAGES = 10;
-
-        const visited = new Set();
-
-        const queue = [
-          parsed.href
-        ];
-
-        const pages = [];
-
-        let totalCharacters = 0;
-
-        let totalLinks = 0;
-
-
-        // ==================================================
-        // SAYFA TARAYICI
-        // ==================================================
-
-        async function crawlPage(pageUrl) {
-
-          try {
-
-            const page = new URL(
-              pageUrl
-            );
-
-            // Sadece aynı domain
-
-            if (
-              page.hostname.toLowerCase() !==
-              hostname
-            ) {
-              return null;
-            }
-
-
-            const response =
-              await fetch(
-                page.href,
-                {
-                  headers: {
-                    "User-Agent":
-                      "Mozilla/5.0 (compatible; WebProofAI/1.0)"
-                  },
-                  redirect: "follow"
-                }
-              );
-
-
-            if (!response.ok) {
-
-              return null;
-            }
-
-
-            const contentType =
-              response.headers.get(
-                "content-type"
-              ) || "";
-
-
-            if (
-              !contentType.includes(
-                "text/html"
-              )
-            ) {
-
-              return null;
-            }
-
-
-            const html =
-              await response.text();
-
-
-            // ==================================================
-            // HTML'DEN METİN ÇIKAR
-            // ==================================================
-
-            const textParts = [];
-
-            const paragraphRegex =
-              /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
-
-            let match;
-
-            while (
-              (
-                match =
-                  paragraphRegex.exec(
-                    html
-                  )
-              ) !== null
-            ) {
-
-              let text =
-                match[1];
-
-              // Script/style temizliği
-
-              text =
-                text.replace(
-                  /<script[\s\S]*?<\/script>/gi,
-                  " "
-                );
-
-              text =
-                text.replace(
-                  /<style[\s\S]*?<\/style>/gi,
-                  " "
-                );
-
-              // HTML tag temizliği
-
-              text =
-                text.replace(
-                  /<[^>]+>/g,
-                  " "
-                );
-
-              // HTML entity
-
-              text =
-                text.replace(
-                  /&nbsp;/gi,
-                  " "
-                );
-
-              text =
-                text.replace(
-                  /&amp;/gi,
-                  "&"
-                );
-
-              text =
-                text.replace(
-                  /&quot;/gi,
-                  '"'
-                );
-
-              text =
-                text.replace(
-                  /&#39;/gi,
-                  "'"
-                );
-
-              // Boşluk temizliği
-
-              text =
-                text.replace(
-                  /\s+/g,
-                  " "
-                )
-                .trim();
-
-
-              if (
-                text.length >= 25
-              ) {
-
-                textParts.push(
-                  text
-                );
-              }
-            }
-
-
-            const text =
-              textParts.join(
-                "\n\n"
-              );
-
-
-            // ==================================================
-            // LİNKLERİ BUL
-            // ==================================================
-
-            const links = [];
-
-            const linkRegex =
-              /<a\b[^>]*href=["']([^"']+)["'][^>]*>/gi;
-
-            let linkMatch;
-
-            while (
-              (
-                linkMatch =
-                  linkRegex.exec(
-                    html
-                  )
-              ) !== null
-            ) {
-
-              const rawHref =
-                linkMatch[1];
-
-              try {
-
-                const absolute =
-                  new URL(
-                    rawHref,
-                    page.href
-                  );
-
-                if (
-                  absolute.protocol !==
-                    "http:" &&
-                  absolute.protocol !==
-                    "https:"
-                ) {
-                  continue;
-                }
-
-
-                if (
-                  absolute.hostname.toLowerCase() !==
-                  hostname
-                ) {
-                  continue;
-                }
-
-
-                // Fragment kaldır
-
-                absolute.hash = "";
-
-
-                // Bazı dosya tiplerini atla
-
-                const pathname =
-                  absolute.pathname.toLowerCase();
-
-                if (
-                  pathname.endsWith(".pdf") ||
-                  pathname.endsWith(".jpg") ||
-                  pathname.endsWith(".jpeg") ||
-                  pathname.endsWith(".png") ||
-                  pathname.endsWith(".gif") ||
-                  pathname.endsWith(".webp") ||
-                  pathname.endsWith(".zip") ||
-                  pathname.endsWith(".mp4")
-                ) {
-                  continue;
-                }
-
-
-                const normalized =
-                  absolute.href;
-
-
-                if (
-                  !links.includes(
-                    normalized
-                  )
-                ) {
-
-                  links.push(
-                    normalized
-                  );
-                }
-
-              } catch {
-                // Geçersiz link
-              }
-            }
-
-
-            return {
-              url: page.href,
-              text,
-              links
-            };
-
-          } catch {
-
-            return null;
-          }
-        }
-
-
-        // ==================================================
-        // CRAWL DÖNGÜSÜ
-        // ==================================================
-
-        while (
-          queue.length > 0 &&
-          visited.size < MAX_PAGES
-        ) {
-
-          const current =
-            queue.shift();
-
-
-          if (
-            visited.has(
-              current
-            )
-          ) {
-            continue;
-          }
-
-
-          visited.add(
-            current
-          );
-
-
-          const result =
-            await crawlPage(
-              current
-            );
-
-
-          if (!result) {
-            continue;
-          }
-
-
-          pages.push({
-            url: result.url,
-            characters:
-              result.text.length
-          });
-
-
-          totalCharacters +=
-            result.text.length;
-
-
-          totalLinks +=
-            result.links.length;
-
-
-          // Yeni linkleri kuyruğa ekle
-
-          for (
-            const link
-            of result.links
-          ) {
-
-            if (
-              visited.size +
-              queue.length >=
-              MAX_PAGES
-            ) {
-              break;
-            }
-
-
-            if (
-              !visited.has(
-                link
-              ) &&
-              !queue.includes(
-                link
-              )
-            ) {
-
-              queue.push(
-                link
-              );
-            }
-          }
-        }
-
-
-        // ==================================================
-        // SONUÇ
-        // ==================================================
-
-        return jsonResponse(
-          {
-            success: true,
-
-            target: targetUrl,
-
-            domain: hostname,
-
-            pagesScanned:
-              pages.length,
-
-            pagesLimit:
-              MAX_PAGES,
-
-            linksFound:
-              totalLinks,
-
-            totalCharacters:
-              totalCharacters,
-
-            readyForAI:
-              pages.length > 0 &&
-              totalCharacters > 0,
-
-            pages: pages,
-
-            message:
-              "Web sitesi başarıyla tarandı. İçerik AI analizine hazır."
-          },
-          200,
-          corsHeaders
-        );
-
-      } catch (error) {
-
-        return jsonResponse(
-          {
-            success: false,
-            error:
-              "Tarama sırasında bir hata oluştu.",
-            detail:
-              String(error)
-          },
-          500,
-          corsHeaders
-        );
-      }
-    }
-
-
-    // ======================================================
-    // WEB ARAYÜZÜ
-    // ======================================================
-
-    const html = `<!DOCTYPE html>
-
+const HTML = `
+<!DOCTYPE html>
 <html lang="tr">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1.0"
->
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WebProof AI</title>
 
-<meta
-  name="description"
-  content="WebProof AI ile web sitelerinizi yapay zekâ ile yazım, dilbilgisi ve noktalama hatalarına karşı kontrol edin."
->
-
 <style>
-
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 body {
-
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    Arial,
-    sans-serif;
-
+  margin: 0;
   min-height: 100vh;
-
+  font-family: Arial, Helvetica, sans-serif;
   background:
-    linear-gradient(
-      135deg,
-      #f7f9fc 0%,
-      #eef3f9 100%
-    );
-
-  color: #111827;
+    radial-gradient(circle at top left, #18345c 0%, transparent 35%),
+    radial-gradient(circle at bottom right, #17213d 0%, transparent 35%),
+    #070b14;
+  color: #ffffff;
 }
 
 .container {
-
-  width: 100%;
-  max-width: 900px;
-
+  width: min(1050px, 92%);
   margin: 0 auto;
-
-  padding: 24px;
+  padding: 70px 0 50px;
 }
 
-header {
-
+.header {
   text-align: center;
-
-  padding:
-    70px 20px 35px;
+  margin-bottom: 45px;
 }
 
 .logo {
-
   display: inline-flex;
-
   align-items: center;
   justify-content: center;
-
-  width: 64px;
-  height: 64px;
-
-  border-radius: 18px;
-
-  background: #111827;
-
-  color: white;
-
-  font-size: 30px;
-
-  font-weight: 800;
-
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #00d4ff, #635bff);
+  font-size: 32px;
   margin-bottom: 20px;
+  box-shadow: 0 0 40px rgba(0, 212, 255, 0.25);
 }
 
 h1 {
-
-  font-size: 46px;
-
-  line-height: 1.1;
-
-  letter-spacing: -1.5px;
-
-  margin-bottom: 16px;
+  margin: 0;
+  font-size: clamp(36px, 7vw, 64px);
+  letter-spacing: -2px;
 }
 
 .subtitle {
-
-  max-width: 650px;
-
-  margin: 0 auto;
-
-  color: #667085;
-
-  font-size: 18px;
-
+  max-width: 700px;
+  margin: 15px auto 0;
+  color: #aab7d4;
+  font-size: 17px;
   line-height: 1.6;
 }
 
-.card {
-
-  background: white;
-
-  border:
-    1px solid #e5e7eb;
-
-  border-radius: 22px;
-
-  padding: 28px;
-
-  box-shadow:
-    0 15px 40px
-    rgba(
-      15,
-      23,
-      42,
-      0.08
-    );
+.online {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 8px 14px;
+  border-radius: 30px;
+  background: rgba(46, 213, 115, 0.1);
+  border: 1px solid rgba(46, 213, 115, 0.25);
+  color: #5cff9a;
+  font-size: 13px;
 }
 
-label {
+.online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #39ff88;
+  box-shadow: 0 0 12px #39ff88;
+}
 
+.card {
+  background: rgba(14, 20, 35, 0.82);
+  border: 1px solid rgba(130, 160, 220, 0.16);
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(15px);
+}
+
+.label {
   display: block;
-
+  margin-bottom: 12px;
+  color: #cbd6ef;
   font-size: 14px;
-
-  font-weight: 700;
-
-  margin-bottom: 10px;
+  font-weight: bold;
 }
 
 .input-row {
-
   display: flex;
-
   gap: 12px;
 }
 
 input {
-
   flex: 1;
-
-  width: 100%;
-
-  padding:
-    17px 18px;
-
-  border:
-    1px solid #d0d5dd;
-
-  border-radius: 12px;
-
+  min-width: 0;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid #293754;
+  background: #080e1c;
+  color: white;
   font-size: 16px;
-
   outline: none;
 }
 
 input:focus {
-
-  border-color: #111827;
-
-  box-shadow:
-    0 0 0 3px
-    rgba(
-      17,
-      24,
-      39,
-      0.08
-    );
+  border-color: #00c8ff;
+  box-shadow: 0 0 0 3px rgba(0, 200, 255, 0.08);
 }
 
 button {
-
   border: 0;
-
-  border-radius: 12px;
-
-  padding:
-    0 25px;
-
-  background: #111827;
-
+  border-radius: 14px;
+  padding: 0 25px;
+  background: linear-gradient(135deg, #00c8ff, #635bff);
   color: white;
-
-  font-size: 16px;
-
-  font-weight: 700;
-
+  font-weight: bold;
+  font-size: 15px;
   cursor: pointer;
+  transition: 0.2s;
+  min-height: 58px;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px rgba(0, 200, 255, 0.2);
 }
 
 button:disabled {
-
   opacity: 0.6;
-
-  cursor: not-allowed;
+  cursor: wait;
+  transform: none;
 }
 
 .status {
-
-  display: none;
-
-  margin-top: 22px;
-
+  margin-top: 20px;
   padding: 16px;
-
-  border-radius: 12px;
-
-  background: #f8fafc;
-
-  border:
-    1px solid #e5e7eb;
-
-  color: #475467;
-
+  border-radius: 14px;
+  background: #0a1120;
+  border: 1px solid #1e2b45;
+  color: #9eafd0;
   line-height: 1.5;
 }
 
-.status.show {
-  display: block;
-}
-
-.result {
-
+.results {
+  margin-top: 25px;
   display: none;
-
-  margin-top: 20px;
-
-  padding: 20px;
-
-  border-radius: 14px;
-
-  background: #f8fafc;
-
-  border:
-    1px solid #e5e7eb;
 }
 
-.result.show {
+.results.show {
   display: block;
 }
 
-.stat-grid {
+.result-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 18px;
+}
 
+.stats {
   display: grid;
-
-  grid-template-columns:
-    repeat(3, 1fr);
-
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-
-  margin-top: 15px;
+  margin-bottom: 20px;
 }
 
 .stat {
-
-  padding: 15px;
-
-  border-radius: 12px;
-
-  background: white;
-
-  border:
-    1px solid #e5e7eb;
-
-  text-align: center;
+  background: #0a1120;
+  border: 1px solid #1c2942;
+  border-radius: 15px;
+  padding: 18px;
 }
 
 .stat-number {
-
-  font-size: 24px;
-
-  font-weight: 800;
+  font-size: 27px;
+  font-weight: bold;
+  color: #ffffff;
 }
 
 .stat-label {
-
-  margin-top: 4px;
-
-  color: #667085;
-
+  margin-top: 5px;
   font-size: 12px;
+  color: #8293b5;
 }
 
 .page-list {
-
-  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.page-item {
+.page {
+  padding: 15px;
+  border-radius: 12px;
+  background: #0a1120;
+  border: 1px solid #1c2942;
+  overflow: hidden;
+}
 
-  padding: 10px 0;
-
-  border-bottom:
-    1px solid #eaecf0;
-
-  font-size: 13px;
-
+.page-url {
+  color: #69d9ff;
   word-break: break-all;
+  font-size: 14px;
 }
 
-.online {
-
-  display: inline-flex;
-
-  align-items: center;
-
-  gap: 7px;
-
-  margin-top: 20px;
-
-  padding:
-    7px 12px;
-
-  border-radius: 999px;
-
-  background: #ecfdf3;
-
-  color: #067647;
-
-  font-size: 13px;
-
-  font-weight: 700;
+.page-info {
+  margin-top: 7px;
+  color: #7889aa;
+  font-size: 12px;
 }
 
-.dot {
-
-  width: 8px;
-  height: 8px;
-
-  border-radius: 50%;
-
-  background: #12b76a;
-}
-
-footer {
-
+.footer {
   text-align: center;
+  margin-top: 35px;
+  color: #566783;
+  font-size: 12px;
+}
 
-  padding:
-    35px 20px;
+.error {
+  color: #ff7b7b;
+}
 
-  color: #98a2b3;
-
-  font-size: 13px;
+.success {
+  color: #66f2a1;
 }
 
 @media (max-width: 700px) {
-
-  header {
-    padding-top: 45px;
+  .container {
+    padding-top: 40px;
   }
 
-  h1 {
-    font-size: 36px;
-  }
-
-  .subtitle {
-    font-size: 16px;
+  .card {
+    padding: 20px;
   }
 
   .input-row {
@@ -968,368 +250,430 @@ footer {
   }
 
   button {
-    height: 52px;
+    width: 100%;
   }
 
-  .card {
-    padding: 20px;
-  }
-
-  .stat-grid {
-    grid-template-columns: 1fr;
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
-
 </style>
-
 </head>
 
 <body>
 
 <div class="container">
 
-<header>
+  <div class="header">
 
-<div class="logo">
-W
-</div>
+    <div class="logo">✓</div>
 
-<h1>
-WebProof AI
-</h1>
+    <h1>WebProof AI</h1>
 
-<p class="subtitle">
-Web sitelerinizi yapay zekâ ile
-yazım, dilbilgisi ve noktalama
-hatalarına karşı kontrol edin.
-</p>
+    <div class="subtitle">
+      Web sitelerinizi yapay zekâ ile yazım, dilbilgisi ve noktalama
+      hatalarına karşı kontrol edin.
+    </div>
 
-<div class="online">
-<span class="dot"></span>
-Sistem çevrimiçi
-</div>
+    <div class="online">
+      <span class="online-dot"></span>
+      Sistem çevrimiçi
+    </div>
 
-</header>
+  </div>
 
+  <div class="card">
 
-<main>
+    <label class="label">
+      Kontrol etmek istediğiniz web sitesi
+    </label>
 
-<div class="card">
+    <div class="input-row">
 
-<label for="siteUrl">
-Kontrol etmek istediğiniz web sitesi
-</label>
+      <input
+        id="urlInput"
+        type="url"
+        placeholder="https://www.bbc.com/turkce"
+        autocomplete="off"
+      >
 
-<div class="input-row">
+      <button id="scanButton">
+        SİTEYİ TARA
+      </button>
 
-<input
-  id="siteUrl"
-  type="url"
-  placeholder="https://www.bbc.com/turkce"
-  autocomplete="url"
->
+    </div>
 
-<button
-  id="scanButton"
-  onclick="startScan()"
->
-SİTEYİ TARA
-</button>
+    <div id="status" class="status">
+      WebProof AI hazır. Bir web sitesi adresi girerek taramayı başlatabilirsiniz.
+    </div>
 
-</div>
+    <div id="results" class="results">
 
+      <div class="result-title">
+        Tarama sonucu
+      </div>
 
-<div
-  id="status"
-  class="status"
-></div>
+      <div class="stats">
 
+        <div class="stat">
+          <div id="pagesScanned" class="stat-number">0</div>
+          <div class="stat-label">Taranan sayfa</div>
+        </div>
 
-<div
-  id="result"
-  class="result"
->
+        <div class="stat">
+          <div id="linksFound" class="stat-number">0</div>
+          <div class="stat-label">Bulunan bağlantı</div>
+        </div>
 
-<strong>
-TARAMA SONUCU
-</strong>
+        <div class="stat">
+          <div id="totalCharacters" class="stat-number">0</div>
+          <div class="stat-label">Metin karakteri</div>
+        </div>
 
-<div
-  id="stats"
-  class="stat-grid"
-></div>
+        <div class="stat">
+          <div id="readyForAI" class="stat-number">0</div>
+          <div class="stat-label">AI için hazır</div>
+        </div>
 
-<div
-  id="pageList"
-  class="page-list"
-></div>
+      </div>
 
-</div>
+      <div id="pageList" class="page-list"></div>
 
-</div>
+    </div>
 
-</main>
+  </div>
 
-
-<footer>
-WebProof AI · AI destekli web içerik kontrol sistemi
-</footer>
+  <div class="footer">
+    WebProof AI · AI destekli web içerik kontrol sistemi
+  </div>
 
 </div>
-
 
 <script>
 
-async function startScan() {
+const input = document.getElementById("urlInput");
+const button = document.getElementById("scanButton");
+const statusBox = document.getElementById("status");
+const results = document.getElementById("results");
 
-  const input =
-    document.getElementById(
-      "siteUrl"
-    );
+const pagesScanned = document.getElementById("pagesScanned");
+const linksFound = document.getElementById("linksFound");
+const totalCharacters = document.getElementById("totalCharacters");
+const readyForAI = document.getElementById("readyForAI");
+const pageList = document.getElementById("pageList");
 
-  const button =
-    document.getElementById(
-      "scanButton"
-    );
+function setStatus(message, type) {
+  statusBox.textContent = message;
+  statusBox.className = "status";
 
-  const status =
-    document.getElementById(
-      "status"
-    );
+  if (type === "error") {
+    statusBox.classList.add("error");
+  }
 
-  const result =
-    document.getElementById(
-      "result"
-    );
+  if (type === "success") {
+    statusBox.classList.add("success");
+  }
+}
 
-  const stats =
-    document.getElementById(
-      "stats"
-    );
+function formatNumber(number) {
+  return Number(number || 0).toLocaleString("tr-TR");
+}
 
-  const pageList =
-    document.getElementById(
-      "pageList"
-    );
+function renderResults(data) {
 
-  const target =
-    input.value.trim();
+  results.classList.add("show");
 
+  pagesScanned.textContent = formatNumber(data.pagesScanned);
+  linksFound.textContent = formatNumber(data.linksFound);
+  totalCharacters.textContent = formatNumber(data.totalCharacters);
+  readyForAI.textContent = formatNumber(data.readyForAI);
 
-  if (!target) {
+  pageList.innerHTML = "";
 
-    status.textContent =
-      "Lütfen bir web sitesi adresi girin.";
+  if (!data.pages || data.pages.length === 0) {
 
-    status.classList.add(
-      "show"
-    );
+    pageList.innerHTML =
+      '<div class="page">Taranabilir sayfa bulunamadı.</div>';
 
     return;
   }
 
+  data.pages.forEach(function(page) {
+
+    const item = document.createElement("div");
+    item.className = "page";
+
+    const url = document.createElement("div");
+    url.className = "page-url";
+    url.textContent = page.url;
+
+    const info = document.createElement("div");
+    info.className = "page-info";
+
+    info.textContent =
+      "HTTP " +
+      page.status +
+      " · " +
+      formatNumber(page.characters) +
+      " karakter";
+
+    item.appendChild(url);
+    item.appendChild(info);
+
+    pageList.appendChild(item);
+
+  });
+}
+
+async function scanSite() {
+
+  const url = input.value.trim();
+
+  if (!url) {
+    setStatus("Lütfen bir web sitesi adresi girin.", "error");
+    input.focus();
+    return;
+  }
+
+  let parsedUrl;
+
+  try {
+    parsedUrl = new URL(url);
+  } catch (error) {
+    setStatus("Geçerli bir web sitesi adresi girin.", "error");
+    return;
+  }
+
+  if (
+    parsedUrl.protocol !== "http:" &&
+    parsedUrl.protocol !== "https:"
+  ) {
+    setStatus("Sadece HTTP veya HTTPS adresleri kullanılabilir.", "error");
+    return;
+  }
 
   button.disabled = true;
+  button.textContent = "TARANIYOR...";
 
-  button.textContent =
-    "TARANIYOR...";
+  results.classList.remove("show");
 
-  result.classList.remove(
-    "show"
+  setStatus(
+    "Web sitesi taranıyor. Sayfalar ve bağlantılar bulunuyor...",
+    null
   );
-
-  status.classList.add(
-    "show"
-  );
-
-  status.textContent =
-    "WebProof AI siteyi tarıyor. Lütfen bekleyin...";
-
 
   try {
 
-    const response =
-      await fetch(
-        "/api/scan",
-        {
-          method: "POST",
+    const response = await fetch("/api/scan", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        url: url
+      })
+    });
 
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
+    const data = await response.json();
 
-          body: JSON.stringify({
-            url: target
-          })
-        }
-      );
-
-
-    const data =
-      await response.json();
-
-
-    if (!response.ok ||
-        !data.success) {
-
+    if (!response.ok || !data.success) {
       throw new Error(
-        data.error ||
-        "Tarama başarısız."
+        data.error || "Tarama sırasında bir hata oluştu."
       );
     }
 
+    renderResults(data);
 
-    status.textContent =
-      "Tarama tamamlandı. İçerik AI analizine hazır.";
-
-
-    stats.innerHTML = `
-
-      <div class="stat">
-
-        <div class="stat-number">
-          ${data.pagesScanned}
-        </div>
-
-        <div class="stat-label">
-          Taranan sayfa
-        </div>
-
-      </div>
-
-
-      <div class="stat">
-
-        <div class="stat-number">
-          ${data.linksFound}
-        </div>
-
-        <div class="stat-label">
-          Bulunan bağlantı
-        </div>
-
-      </div>
-
-
-      <div class="stat">
-
-        <div class="stat-number">
-          ${data.totalCharacters.toLocaleString("tr-TR")}
-        </div>
-
-        <div class="stat-label">
-          Metin karakteri
-        </div>
-
-      </div>
-
-    `;
-
-
-    pageList.innerHTML =
-      "<strong>Taranan sayfalar</strong>";
-
-
-    for (
-      const page
-      of data.pages
-    ) {
-
-      const item =
-        document.createElement(
-          "div"
-        );
-
-      item.className =
-        "page-item";
-
-      item.textContent =
-        page.url +
-        " · " +
-        page.characters +
-        " karakter";
-
-      pageList.appendChild(
-        item
-      );
-    }
-
-
-    result.classList.add(
-      "show"
+    setStatus(
+      "Tarama tamamlandı. Bulunan içerikler AI analizine hazır.",
+      "success"
     );
-
 
   } catch (error) {
 
-    status.textContent =
-      error.message ||
-      "Tarama sırasında hata oluştu.";
-
-    result.classList.remove(
-      "show"
+    setStatus(
+      "Hata: " + error.message,
+      "error"
     );
 
+  } finally {
+
+    button.disabled = false;
+    button.textContent = "SİTEYİ TARA";
+
+  }
+}
+
+button.addEventListener("click", scanSite);
+
+input.addEventListener("keydown", function(event) {
+
+  if (event.key === "Enter") {
+    scanSite();
   }
 
-
-  button.disabled = false;
-
-  button.textContent =
-    "SİTEYİ TARA";
-}
+});
 
 </script>
 
 </body>
+</html>
+`;
 
-</html>`;
-
-
-    return new Response(
-      html,
-      {
-        status: 200,
-
-        headers: {
-          "Content-Type":
-            "text/html; charset=UTF-8",
-
-          "Cache-Control":
-            "no-cache"
-        }
-      }
-    );
-  }
-};
-
-
-// ==========================================================
-// JSON YARDIMCI FONKSİYON
-// ==========================================================
-
-function jsonResponse(
-  data,
-  status,
-  corsHeaders
-) {
-
+function jsonResponse(data, status = 200) {
   return new Response(
-    JSON.stringify(
-      data,
-      null,
-      2
-    ),
+    JSON.stringify(data, null, 2),
     {
       status,
-
       headers: {
-        "Content-Type":
-          "application/json; charset=UTF-8",
-
-        ...corsHeaders
+        "Content-Type": "application/json; charset=UTF-8",
+        "Access-Control-Allow-Origin": "*"
       }
     }
   );
 }
+
+function normalizeUrl(url) {
+
+  try {
+
+    const parsed = new URL(url);
+
+    parsed.hash = "";
+
+    if (
+      parsed.protocol !== "http:" &&
+      parsed.protocol !== "https:"
+    ) {
+      return null;
+    }
+
+    return parsed.href;
+
+  } catch {
+    return null;
+  }
+}
+
+function isBlockedHost(hostname) {
+
+  const host = hostname.toLowerCase();
+
+  const blocked = [
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "::1",
+    "metadata.google.internal",
+    "metadata.google",
+    "169.254.169.254"
+  ];
+
+  if (blocked.includes(host)) {
+    return true;
+  }
+
+  if (
+    host.startsWith("10.") ||
+    host.startsWith("192.168.") ||
+    host.startsWith("127.")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function shouldSkipUrl(url) {
+
+  const lower = url.toLowerCase();
+
+  const extensions = [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".ico",
+    ".pdf",
+    ".zip",
+    ".rar",
+    ".7z",
+    ".mp3",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".webm",
+    ".css",
+    ".js",
+    ".xml",
+    ".json",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot"
+  ];
+
+  return extensions.some(function(extension) {
+    return lower.includes(extension);
+  });
+}
+
+function extractText(html) {
+
+  let text = html;
+
+  text = text.replace(
+    /<script[\s\S]*?<\/script>/gi,
+    " "
+  );
+
+  text = text.replace(
+    /<style[\s\S]*?<\/style>/gi,
+    " "
+  );
+
+  text = text.replace(
+    /<noscript[\s\S]*?<\/noscript>/gi,
+    " "
+  );
+
+  text = text.replace(
+    /<svg[\s\S]*?<\/svg>/gi,
+    " "
+  );
+
+  text = text.replace(
+    /<nav[\s\S]*?<\/nav>/gi,
+    " "
+  );
+
+  text = text.replace(
+    /<footer[\s\S]*?<\/footer>/gi,
+    " "
+  );
+
+  text = text.replace(
+    /<header[\s\S]*?<\/header>/gi,
+    " "
+  );
+
+  const paragraphs = [];
+
+  const paragraphRegex =
+    /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+
+  let match;
+
+  while ((match = paragraphRegex.exec(text)) !== null) {
+
+    let paragraph = match[1];
+
+    paragraph = paragraph.replace(
+      /<[^>]+>/g,
+      " "
+    );
+
+    paragraph = paragraph.replace(
+      /&
