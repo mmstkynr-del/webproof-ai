@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse
 from openai import OpenAI
 
 # ============================================================
-# WEBPROOF AI - BBC + NVIDIA
+# WEBPROOF AI - KURAL MOTORU + NVIDIA
 # ============================================================
 
 BASE_URL = "https://www.bbc.com/turkce"
@@ -21,9 +21,187 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (WebProof AI)"
 }
 
+# ============================================================
+# 1. KURAL MOTORU
+# ============================================================
+
+def rule_check(text):
+
+    errors = []
+
+    # --------------------------------------------------------
+    # A) Noktalama işaretinden ÖNCE gereksiz boşluk
+    # --------------------------------------------------------
+
+    pattern = r"\s+([,.!?;:])"
+
+    for match in re.finditer(pattern, text):
+
+        original = match.group(0)
+        punctuation = match.group(1)
+
+        start = max(0, match.start() - 60)
+        end = min(len(text), match.end() + 60)
+
+        context = text[start:end]
+
+        errors.append({
+            "type": "boşluk",
+            "original": original,
+            "suggestion": punctuation,
+            "context": context
+        })
+
+    # --------------------------------------------------------
+    # B) Noktalama işaretinden SONRA eksik boşluk
+    # --------------------------------------------------------
+
+    pattern = r"([,.!?;:])([A-Za-zÇĞİÖŞÜçğıöşü])"
+
+    for match in re.finditer(pattern, text):
+
+        punctuation = match.group(1)
+        letter = match.group(2)
+
+        # Ondalık sayı gibi durumları atla
+        if punctuation == "," and letter.isdigit():
+            continue
+
+        original = match.group(0)
+        suggestion = punctuation + " " + letter
+
+        start = max(0, match.start() - 60)
+        end = min(len(text), match.end() + 60)
+
+        context = text[start:end]
+
+        errors.append({
+            "type": "eksik boşluk",
+            "original": original,
+            "suggestion": suggestion,
+            "context": context
+        })
+
+    # --------------------------------------------------------
+    # C) Sayı + kelime birleşmesi
+    # Örnek: araçlarının10 → araçlarının 10
+    # --------------------------------------------------------
+
+    pattern = r"([A-Za-zÇĞİÖŞÜçğıöşü])(\d+)"
+
+    for match in re.finditer(pattern, text):
+
+        original = match.group(0)
+
+        # Tarih, saat ve benzeri yaygın yapıları atla
+        if re.search(r"\d{1,2}:\d{2}", original):
+            continue
+
+        letter = match.group(1)
+        number = match.group(2)
+
+        suggestion = letter + " " + number
+
+        start = max(0, match.start() - 60)
+        end = min(len(text), match.end() + 60)
+
+        context = text[start:end]
+
+        errors.append({
+            "type": "kelime-sayı birleşmesi",
+            "original": original,
+            "suggestion": suggestion,
+            "context": context
+        })
+
+    # --------------------------------------------------------
+    # D) Sayı + kelime arasında eksik boşluk
+    # Örnek: 10kişi → 10 kişi
+    # --------------------------------------------------------
+
+    pattern = r"(\d)([A-Za-zÇĞİÖŞÜçğıöşü])"
+
+    for match in re.finditer(pattern, text):
+
+        original = match.group(0)
+
+        # Saatleri atla
+        if re.search(r"\d:\d", original):
+            continue
+
+        number = match.group(1)
+        letter = match.group(2)
+
+        suggestion = number + " " + letter
+
+        start = max(0, match.start() - 60)
+        end = min(len(text), match.end() + 60)
+
+        context = text[start:end]
+
+        errors.append({
+            "type": "sayı-kelime birleşmesi",
+            "original": original,
+            "suggestion": suggestion,
+            "context": context
+        })
+
+    # --------------------------------------------------------
+    # E) Türkçede "yurt dışı" / "yurt dışına" vb.
+    # --------------------------------------------------------
+
+    patterns = {
+        r"\byurtdışı\b": "yurt dışı",
+        r"\byurtdışına\b": "yurt dışına",
+        r"\byurtdışında\b": "yurt dışında",
+        r"\byurtdışından\b": "yurt dışından"
+    }
+
+    for pattern, suggestion in patterns.items():
+
+        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+
+            original = match.group(0)
+
+            start = max(0, match.start() - 60)
+            end = min(len(text), match.end() + 60)
+
+            context = text[start:end]
+
+            errors.append({
+                "type": "yazım",
+                "original": original,
+                "suggestion": suggestion,
+                "context": context
+            })
+
+    # --------------------------------------------------------
+    # F) Kesin boşluk hataları
+    # --------------------------------------------------------
+
+    pattern = r"\s{2,}"
+
+    for match in re.finditer(pattern, text):
+
+        original = match.group(0)
+
+        start = max(0, match.start() - 60)
+        end = min(len(text), match.end() + 60)
+
+        context = text[start:end]
+
+        errors.append({
+            "type": "fazla boşluk",
+            "original": original,
+            "suggestion": " ",
+            "context": context
+        })
+
+    return errors
+
 
 # ============================================================
-# BBC HABER LİNKLERİNİ BUL
+# 2. BBC HABER LİNKLERİNİ BUL
 # ============================================================
 
 def get_article_urls():
@@ -45,6 +223,7 @@ def get_article_urls():
     for a in soup.find_all("a", href=True):
 
         url = urljoin(BASE_URL, a["href"])
+
         parsed = urlparse(url)
 
         if parsed.netloc not in ["www.bbc.com", "bbc.com"]:
@@ -61,7 +240,7 @@ def get_article_urls():
 
 
 # ============================================================
-# HABER METNİNİ TEMİZLE
+# 3. HABER METNİNİ ÇIKAR
 # ============================================================
 
 def extract_article(url):
@@ -73,12 +252,13 @@ def extract_article(url):
     )
 
     if response.status_code != 200:
+
         print(f"Haber HTTP: {response.status_code}")
+
         return None
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # Gereksiz HTML bölümlerini kaldır
     for tag in soup([
         "script",
         "style",
@@ -91,9 +271,9 @@ def extract_article(url):
         "aside",
         "iframe"
     ]):
+
         tag.decompose()
 
-    # Ana içerik
     main = soup.find("main")
 
     if not main:
@@ -102,26 +282,33 @@ def extract_article(url):
     if not main:
         return None
 
-    # Başlık
     title = ""
 
     if soup.title:
-        title = soup.title.get_text(" ", strip=True)
 
-    # Paragrafları al
+        title = soup.title.get_text(
+            " ",
+            strip=True
+        )
+
     paragraphs = []
 
     for p in main.find_all("p"):
 
-        text = p.get_text(" ", strip=True)
+        text = p.get_text(
+            " ",
+            strip=True
+        )
 
-        text = re.sub(r"\s+", " ", text)
+        text = re.sub(
+            r"\s+",
+            " ",
+            text
+        )
 
-        # Çok kısa metinleri alma
         if len(text) < 25:
             continue
 
-        # Tekrarları kaldır
         if text not in paragraphs:
             paragraphs.append(text)
 
@@ -130,7 +317,6 @@ def extract_article(url):
     if not body:
         return None
 
-    # Maksimum metin uzunluğu
     body = body[:12000]
 
     return {
@@ -140,20 +326,22 @@ def extract_article(url):
 
 
 # ============================================================
-# NVIDIA ANALİZİ
+# 4. NVIDIA ANALİZİ
 # ============================================================
 
 def analyze_with_nvidia(article):
 
     prompt = f"""
-Aşağıdaki Türkçe haber metnini profesyonel bir haber editörü
-gibi kontrol et.
+Aşağıdaki Türkçe haber metnini profesyonel bir Türkçe
+haber editörü olarak kontrol et.
 
-SADECE şu hataları bildir:
+SADECE KESİN OLDUĞUNDAN EMİN OLDUĞUN HATALARI BUL.
+
+Kontrol et:
 
 - Kesin yazım hataları
-- Kesin noktalama hataları
 - Kesin dilbilgisi hataları
+- Kesin noktalama hataları
 - Açık harf/klavye hataları
 - Açık boşluk hataları
 
@@ -161,17 +349,11 @@ SADECE şu hataları bildir:
 
 Emin olmadığın hiçbir şeyi hata olarak bildirme.
 
-Stil tercihi olan ifadeleri hata olarak bildirme.
+Stil tercihini hata olarak bildirme.
 
 Cümleyi daha güzel hale getirmek için değiştirme.
 
-Gazetecilik üslubunu değiştirme.
-
-Siyasi anlamı değiştirme.
-
-Hukuki anlamı değiştirme.
-
-Ekonomik anlamı değiştirme.
+Anlamı değiştirme.
 
 Kişi isimlerini değiştirme.
 
@@ -179,51 +361,46 @@ Kurum isimlerini değiştirme.
 
 Yer isimlerini değiştirme.
 
-Özel isimleri düzeltmeye çalışma.
+Özel isimleri değiştirme.
 
-Bir ifade sadece daha iyi yazılabilir diye hata olarak gösterme.
+Siyasi ifadeleri değiştirme.
 
-Yalnızca gerçekten yanlış olduğundan emin olduğun noktaları bildir.
+Gazetecilik üslubunu değiştirme.
 
-ÇIKTI KURALI:
+Sadece gerçekten yanlış olduğundan emin olduğun
+hataları bildir.
 
-Kesin hata varsa yalnızca şu formatı kullan:
+ÇIKTI FORMATI:
 
-HATA
-Orijinal: ...
-Öneri: ...
-Açıklama: ...
+Hata varsa:
 
 HATA
 Orijinal: ...
 Öneri: ...
 Açıklama: ...
 
-Birden fazla hata varsa aynı formatı tekrar et.
+HATA
+Orijinal: ...
+Öneri: ...
+Açıklama: ...
 
-Kesin hata yoksa yalnızca:
+Kesin hata yoksa:
 
 HATA YOK
 
-yaz.
+SADECE nihai sonucu ver.
 
-ASLA şunları yazma:
-
-- düşünme süreci
-- analiz süreci
-- reasoning
-- thinking process
-- adım adım değerlendirme
-- "Let's analyze"
-- "The user wants"
-- İngilizce açıklama
-
-SADECE nihai editör sonucunu ver.
+Düşünme süreci yazma.
+Reasoning yazma.
+Thinking process yazma.
+İngilizce açıklama yazma.
 
 HABER BAŞLIĞI:
+
 {article["title"]}
 
 HABER METNİ:
+
 {article["text"]}
 """
 
@@ -235,10 +412,9 @@ HABER METNİ:
             {
                 "role": "system",
                 "content": (
-                    "Sen yalnızca nihai editör sonucunu veren "
-                    "profesyonel bir Türkçe haber editörüsün. "
-                    "İç düşünme veya reasoning metni üretme. "
-                    "Sadece kesin hataları bildir."
+                    "Sen profesyonel bir Türkçe haber "
+                    "editörüsün. Sadece nihai sonucu ver. "
+                    "İç düşünme veya reasoning üretme."
                 )
             },
             {
@@ -266,13 +442,13 @@ HABER METNİ:
 
 
 # ============================================================
-# ANA PROGRAM
+# 5. ANA PROGRAM
 # ============================================================
 
 print()
 print("========================================")
 print("WEBPROOF AI")
-print("BBC + NVIDIA GERÇEK HABER TESTİ")
+print("KURAL MOTORU + NVIDIA")
 print("========================================")
 print()
 
@@ -280,19 +456,24 @@ try:
 
     urls = get_article_urls()
 
-    print(f"Bulunan haber bağlantısı: {len(urls)}")
+    print(
+        f"Bulunan haber bağlantısı: {len(urls)}"
+    )
 
-    # Şimdilik sadece 5 haber
     urls = urls[:5]
 
     successful = 0
+    total_rule_errors = 0
 
     for index, url in enumerate(urls, 1):
 
         print()
         print("========================================")
-        print(f"HABER {index}/{len(urls)}")
+        print(
+            f"HABER {index}/{len(urls)}"
+        )
         print("========================================")
+
         print(url)
 
         try:
@@ -300,22 +481,84 @@ try:
             article = extract_article(url)
 
             if not article:
+
                 print("❌ Haber metni alınamadı.")
+
                 continue
 
-            print(f"Başlık: {article['title']}")
-            print(f"Metin uzunluğu: {len(article['text'])} karakter")
+            print(
+                f"Başlık: {article['title']}"
+            )
+
+            print(
+                f"Metin uzunluğu: "
+                f"{len(article['text'])} karakter"
+            )
+
+            # ------------------------------------------------
+            # KURAL MOTORU
+            # ------------------------------------------------
+
+            print()
+            print("Kural motoru çalışıyor...")
+
+            rule_errors = rule_check(
+                article["text"]
+            )
+
+            total_rule_errors += len(rule_errors)
+
+            print(
+                f"Kural motoru bulduğu hata: "
+                f"{len(rule_errors)}"
+            )
+
+            if rule_errors:
+
+                print()
+                print("KURAL MOTORU SONUÇLARI")
+                print("----------------------------------------")
+
+                for error in rule_errors:
+
+                    print(
+                        f"Tür: {error['type']}"
+                    )
+
+                    print(
+                        f"Orijinal: "
+                        f"{error['original']}"
+                    )
+
+                    print(
+                        f"Öneri: "
+                        f"{error['suggestion']}"
+                    )
+
+                    print(
+                        f"Bağlam: "
+                        f"{error['context']}"
+                    )
+
+                    print("----------------------------------------")
+
+            # ------------------------------------------------
+            # NVIDIA
+            # ------------------------------------------------
 
             print()
             print("NVIDIA analiz ediyor...")
 
-            result = analyze_with_nvidia(article)
+            result = analyze_with_nvidia(
+                article
+            )
 
             successful += 1
 
             print()
             print("NVIDIA SONUCU")
             print("----------------------------------------")
+
             print(result)
 
         except Exception as e:
@@ -323,26 +566,47 @@ try:
             error_text = str(e)
 
             print()
-            print("❌ NVIDIA/HABER HATASI")
+            print("❌ HATA")
             print("----------------------------------------")
+
             print(error_text)
 
             if "429" in error_text:
 
                 print()
-                print("⚠️ NVIDIA kota/limit nedeniyle bu haber analiz edilemedi.")
+                print(
+                    "⚠️ NVIDIA kota/limit nedeniyle "
+                    "analiz yapılamadı."
+                )
 
             elif "410" in error_text:
 
                 print()
-                print("⚠️ NVIDIA modeli artık kullanılamıyor.")
+                print(
+                    "⚠️ NVIDIA modeli artık "
+                    "kullanılamıyor."
+                )
 
     print()
     print("========================================")
     print("TEST SONUCU")
     print("========================================")
-    print(f"Başarılı analiz: {successful}")
-    print(f"Toplam haber: {len(urls)}")
+
+    print(
+        f"Başarılı NVIDIA analiz: "
+        f"{successful}"
+    )
+
+    print(
+        f"Toplam haber: "
+        f"{len(urls)}"
+    )
+
+    print(
+        f"Toplam kural motoru bulgusu: "
+        f"{total_rule_errors}"
+    )
+
     print("========================================")
 
 except Exception as e:
@@ -351,4 +615,5 @@ except Exception as e:
     print("========================================")
     print("❌ GENEL HATA")
     print("========================================")
+
     print(str(e))
