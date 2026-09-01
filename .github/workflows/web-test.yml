@@ -1,10 +1,10 @@
-name: WebProof AI - Temiz Haber Metni Testi
+name: WebProof AI - Gemini Kota Kontrolü
 
 on:
   workflow_dispatch:
 
 jobs:
-  webproof-clean-test:
+  webproof-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -13,594 +13,286 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Gerekli paketleri kur
+      - name: Kütüphaneleri kur
         run: |
           python -m pip install --upgrade pip
           pip install google-genai beautifulsoup4 requests
 
-      - name: WebProof AI temiz metin testi
+      - name: BBC haberlerini tara ve Gemini ile kontrol et
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          cat > webproof_test.py <<'PY'
-          import requests
-          from bs4 import BeautifulSoup
-          from google import genai
+          python - <<'PY'
+          import os
           import re
           import time
-          import os
+          import hashlib
+          import requests
+          from bs4 import BeautifulSoup
           from urllib.parse import urljoin, urlparse
+          from google import genai
 
-          BBC_URL = "https://www.bbc.com/turkce"
-          BBC_DOMAIN = "www.bbc.com"
+          BASE_URL = "https://www.bbc.com/turkce"
+          MODEL = "gemini-3.6-flash"
 
-          HEADERS = {
-              "User-Agent": (
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/139.0.0.0 Safari/537.36"
-              ),
-              "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8"
+          headers = {
+              "User-Agent": "Mozilla/5.0"
           }
 
-          print("=" * 70)
-          print("WEBPROOF AI - TEMİZ HABER METNİ TESTİ")
-          print("=" * 70)
+          print("========================================")
+          print("WEBPROOF AI")
+          print("Gemini kota kontrollü test")
+          print("========================================")
 
-          # ============================================================
-          # 1. BBC ANA SAYFASINI İNDİR
-          # ============================================================
+          # ----------------------------------------
+          # 1. BBC ana sayfasını al
+          # ----------------------------------------
 
-          print("\n[1] BBC ana sayfası indiriliyor...")
+          response = requests.get(
+              BASE_URL,
+              headers=headers,
+              timeout=15
+          )
 
-          try:
-              response = requests.get(
-                  BBC_URL,
-                  headers=HEADERS,
-                  timeout=20
-              )
-              response.raise_for_status()
-          except Exception as e:
-              print("BBC bağlantı hatası:", e)
-              raise
-
-          print("HTTP:", response.status_code)
-          print("HTML uzunluğu:", len(response.text))
+          print(f"BBC HTTP: {response.status_code}")
 
           soup = BeautifulSoup(response.text, "html.parser")
 
-          # ============================================================
-          # 2. HABER BAĞLANTILARINI BUL
-          # ============================================================
-
-          print("\n[2] Haber bağlantıları aranıyor...")
+          # ----------------------------------------
+          # 2. Haber bağlantılarını bul
+          # ----------------------------------------
 
           article_urls = []
 
           for a in soup.find_all("a", href=True):
+              href = urljoin(BASE_URL, a["href"])
+              parsed = urlparse(href)
 
-              href = a.get("href", "").strip()
-
-              if not href:
+              if parsed.netloc not in ["www.bbc.com", "bbc.com"]:
                   continue
 
-              # Göreli veya tam URL'yi normalize et
-              full_url = urljoin(BBC_URL, href)
-
-              parsed = urlparse(full_url)
-
-              # Sadece BBC
-              if parsed.netloc not in [
-                  "www.bbc.com",
-                  "bbc.com"
-              ]:
-                  continue
-
-              path = parsed.path
-
-              # --------------------------------------------------------
-              # BBC Türkçe haber adresleri:
-              #
-              # /turkce/articles/...
-              # /turkce/articles/...?...
-              #
-              # Ayrıca bazı BBC sayfalarında farklı uzantılar olabilir.
-              # Önceliği articles adreslerine veriyoruz.
-              # --------------------------------------------------------
-
-              if path.startswith("/turkce/articles/"):
-
+              if parsed.path.startswith("/turkce/articles/"):
                   clean_url = (
-                      "https://www.bbc.com"
-                      + path
+                      f"https://www.bbc.com{parsed.path}"
                   )
 
                   if clean_url not in article_urls:
                       article_urls.append(clean_url)
 
-          print(
-              "BBC /turkce/articles bağlantısı:",
-              len(article_urls)
-          )
+          print(f"Bulunan haber bağlantısı: {len(article_urls)}")
 
-          # ============================================================
-          # 3. EĞER 0 İSE HTML'DEKİ BBC TÜRKÇE LİNKLERİNİ İNCELE
-          # ============================================================
-
-          if len(article_urls) == 0:
-
-              print(
-                  "\nUYARI: /turkce/articles/ filtresiyle "
-                  "haber bulunamadı."
-              )
-
-              print(
-                  "BBC sayfasındaki örnek bağlantılar inceleniyor..."
-              )
-
-              debug_links = []
-
-              for a in soup.find_all("a", href=True):
-
-                  href = a.get("href", "").strip()
-
-                  if "/turkce/" in href:
-
-                      if href not in debug_links:
-                          debug_links.append(href)
-
-              print(
-                  "\nBulunan BBC Türkçe bağlantı örnekleri:"
-              )
-
-              for link in debug_links[:30]:
-                  print("-", link)
-
-              # HTML içinde articles kelimesini ara
-              articles_count = response.text.count(
-                  "/turkce/articles/"
-              )
-
-              print(
-                  "\nHTML içinde '/turkce/articles/' sayısı:",
-                  articles_count
-              )
-
-              raise RuntimeError(
-                  "BBC haber bağlantıları bulunamadı. "
-                  "HTML yapısı değişmiş olabilir."
-              )
-
-          # İlk 5 haber
           article_urls = article_urls[:5]
 
-          print("\nTest edilecek haberler:")
+          # ----------------------------------------
+          # 3. Temiz haber metni çıkar
+          # ----------------------------------------
 
-          for i, url in enumerate(article_urls, 1):
-              print(f"{i}. {url}")
+          def extract_article(url):
 
-          # ============================================================
-          # 4. TEMİZ HABER METNİ ÇIKARMA
-          # ============================================================
+              r = requests.get(
+                  url,
+                  headers=headers,
+                  timeout=15
+              )
 
-          def extract_clean_article(url):
-
-              print("\n" + "-" * 70)
-              print("Haber indiriliyor:")
-              print(url)
-
-              try:
-
-                  r = requests.get(
-                      url,
-                      headers=HEADERS,
-                      timeout=20
-                  )
-
-                  print("HTTP:", r.status_code)
-
-                  if r.status_code != 200:
-                      return None
-
-                  page = BeautifulSoup(
-                      r.text,
-                      "html.parser"
-                  )
-
-                  # ----------------------------------------------------
-                  # Gereksiz HTML elementleri
-                  # ----------------------------------------------------
-
-                  remove_tags = [
-                      "script",
-                      "style",
-                      "noscript",
-                      "svg",
-                      "nav",
-                      "footer",
-                      "header",
-                      "form",
-                      "aside",
-                      "iframe"
-                  ]
-
-                  for tag_name in remove_tags:
-
-                      for tag in page.find_all(tag_name):
-                          tag.decompose()
-
-                  # ----------------------------------------------------
-                  # Ana içerik alanını bul
-                  # ----------------------------------------------------
-
-                  main = page.find("main")
-
-                  if main:
-                      container = main
-                  else:
-                      container = page.body
-
-                  if not container:
-                      return None
-
-                  # ----------------------------------------------------
-                  # Başlık
-                  # ----------------------------------------------------
-
-                  title = ""
-
-                  h1 = container.find("h1")
-
-                  if h1:
-
-                      title = h1.get_text(
-                          " ",
-                          strip=True
-                      )
-
-                  # ----------------------------------------------------
-                  # Gereksiz içerik filtreleri
-                  # ----------------------------------------------------
-
-                  bad_phrases = [
-                      "WhatsApp",
-                      "Haberin başlığını atlayın",
-                      "okumaya devam edin",
-                      "En çok okunanlar",
-                      "Bizi takip edin",
-                      "BBC News Türkçe",
-                      "Çerez",
-                      "Gizlilik",
-                      "Kullanım koşulları",
-                      "Menü",
-                      "Ana sayfa",
-                      "Bildirimleri açın",
-                      "Uygulamayı indirin",
-                      "Sosyal medyada takip edin"
-                  ]
-
-                  # ----------------------------------------------------
-                  # Önce açıkça gereksiz alanları temizle
-                  # ----------------------------------------------------
-
-                  for element in container.find_all(
-                      [
-                          "div",
-                          "section",
-                          "aside"
-                      ]
-                  ):
-
-                      text = element.get_text(
-                          " ",
-                          strip=True
-                      )
-
-                      if not text:
-                          continue
-
-                      lower_text = text.lower()
-
-                      if any(
-                          phrase.lower() in lower_text
-                          for phrase in bad_phrases
-                      ):
-
-                          # Çok büyük bir container ise
-                          # yanlışlıkla tüm makaleyi silmemek için
-                          # yalnızca küçük/orta bloklarda uygula.
-                          if len(text) < 1500:
-                              element.decompose()
-
-                  # ----------------------------------------------------
-                  # Paragrafları çıkar
-                  # ----------------------------------------------------
-
-                  paragraphs = []
-
-                  for p in container.find_all("p"):
-
-                      text = p.get_text(
-                          " ",
-                          strip=True
-                      )
-
-                      if not text:
-                          continue
-
-                      # Çok kısa navigasyon parçalarını çıkar
-                      if len(text) < 25:
-                          continue
-
-                      lower_text = text.lower()
-
-                      if any(
-                          phrase.lower() in lower_text
-                          for phrase in bad_phrases
-                      ):
-                          continue
-
-                      # Fazla boşluk
-                      text = re.sub(
-                          r"\s+",
-                          " ",
-                          text
-                      ).strip()
-
-                      paragraphs.append(text)
-
-                  # ----------------------------------------------------
-                  # Tekrarlanan paragrafları kaldır
-                  # ----------------------------------------------------
-
-                  unique_paragraphs = []
-
-                  seen = set()
-
-                  for text in paragraphs:
-
-                      key = text.lower()
-
-                      if key in seen:
-                          continue
-
-                      seen.add(key)
-
-                      unique_paragraphs.append(text)
-
-                  # ----------------------------------------------------
-                  # Son metin
-                  # ----------------------------------------------------
-
-                  parts = []
-
-                  if title:
-                      parts.append(title)
-
-                  parts.extend(unique_paragraphs)
-
-                  text = "\n\n".join(parts)
-
-                  text = re.sub(
-                      r"\n{3,}",
-                      "\n\n",
-                      text
-                  )
-
-                  text = re.sub(
-                      r"[ \t]{2,}",
-                      " ",
-                      text
-                  )
-
-                  text = text.strip()
-
-                  if len(text) < 200:
-
-                      print(
-                          "UYARI: Temiz metin çok kısa:",
-                          len(text)
-                      )
-
-                  return {
-                      "title": title,
-                      "text": text
-                  }
-
-              except Exception as e:
-
-                  print("Haber işleme hatası:", e)
-
+              if r.status_code != 200:
+                  print(f"  HTTP hata: {r.status_code}")
                   return None
 
-          # ============================================================
-          # 5. HABERLERİ TEMİZLE
-          # ============================================================
+              soup = BeautifulSoup(r.text, "html.parser")
 
-          articles = []
+              for tag in soup([
+                  "script",
+                  "style",
+                  "noscript",
+                  "svg",
+                  "nav",
+                  "footer",
+                  "header",
+                  "form",
+                  "aside",
+                  "iframe"
+              ]):
+                  tag.decompose()
 
-          for i, url in enumerate(article_urls, 1):
+              main = soup.find("main")
 
-              result = extract_clean_article(url)
+              if not main:
+                  main = soup.body
 
-              if not result:
+              if not main:
+                  return None
 
-                  print(
-                      "Metin alınamadı."
-                  )
+              paragraphs = []
 
-                  continue
+              for p in main.find_all("p"):
+                  text = p.get_text(" ", strip=True)
 
-              text = result["text"]
+                  if len(text) >= 25:
+                      text = re.sub(r"\s+", " ", text)
 
-              print(
-                  "Başlık:",
-                  result["title"]
-              )
+                      if text not in paragraphs:
+                          paragraphs.append(text)
 
-              print(
-                  "Temiz metin uzunluğu:",
-                  len(text)
-              )
+              text = "\n\n".join(paragraphs)
 
-              print("\nİlk 500 karakter:")
+              return text[:12000]
 
-              print(text[:500])
-
-              articles.append({
-                  "url": url,
-                  "title": result["title"],
-                  "text": text
-              })
-
-          # ============================================================
-          # 6. TEMİZLEME SONUCU
-          # ============================================================
-
-          print("\n" + "=" * 70)
-          print("TEMİZ METİN TEST SONUCU")
-          print("=" * 70)
-
-          print(
-              "Toplam haber:",
-              len(articles)
-          )
-
-          for i, article in enumerate(
-              articles,
-              1
-          ):
-
-              print(
-                  f"{i}. "
-                  f"{len(article['text'])} karakter - "
-                  f"{article['title']}"
-              )
-
-          # ============================================================
-          # 7. GEMINI YAZIM DENETİMİ
-          # ============================================================
-
-          if not articles:
-
-              raise RuntimeError(
-                  "Analiz edilecek haber bulunamadı."
-              )
-
-          print("\n" + "=" * 70)
-          print("GEMINI YAZIM DENETİMİ")
-          print("=" * 70)
+          # ----------------------------------------
+          # 4. Gemini
+          # ----------------------------------------
 
           client = genai.Client(
               api_key=os.environ["GEMINI_API_KEY"]
           )
 
-          for i, article in enumerate(
-              articles,
-              1
-          ):
+          successful = 0
+          quota_hit = False
 
-              print("\n" + "-" * 70)
+          for index, url in enumerate(article_urls, 1):
 
-              print(
-                  f"GEMINI TESTİ "
-                  f"{i}/{len(articles)}"
-              )
+              print()
+              print("========================================")
+              print(f"HABER {index}/{len(article_urls)}")
+              print(url)
+              print("========================================")
 
-              print(
-                  article["title"]
-              )
+              text = extract_article(url)
+
+              if not text:
+                  print("Metin alınamadı.")
+                  continue
+
+              print(f"Metin uzunluğu: {len(text)} karakter")
 
               prompt = f"""
           Sen profesyonel bir Türkçe haber editörüsün.
 
-          Aşağıdaki haber metnini yalnızca açık ve kesin:
+          Aşağıdaki haber metnini yalnızca gerçekten açık olan:
 
-          - yazım yanlışları
-          - noktalama yanlışları
-          - bariz dilbilgisi hataları
+          - yazım hataları
+          - noktalama hataları
+          - açık dilbilgisi hataları
+          - kelime içindeki bariz harf hataları
+          - bariz boşluk hataları
 
           açısından kontrol et.
 
-          Emin olmadığın ifadeleri HATA olarak gösterme.
+          Siyasi, hukuki, ekonomik veya haber dilini gereksiz yere değiştirme.
 
-          Siyasi, hukuki, ekonomik veya haber dilindeki
-          tercihleri gereksiz yere değiştirme.
+          Özel isimleri, kurum isimlerini ve kişi isimlerini değiştirme.
 
-          Özel isimleri ve kurum isimlerini değiştirme.
+          Emin olmadığın bir ifadeyi HATA olarak gösterme.
 
-          Her hata için:
+          Her hata için şu formatı kullan:
 
           HATA:
-          DÜZELTME:
-          NEDEN:
+          Orijinal: ...
+          Öneri: ...
+          Açıklama: ...
 
-          formatını kullan.
+          Hiç hata yoksa:
 
-          Eğer açık bir hata yoksa:
+          HATA YOK
 
-          Açık bir yazım veya dilbilgisi hatası bulunamadı.
+          Haber metni:
 
-          yaz.
-
-          HABER:
-
-          {article["text"][:10000]}
+          {text}
           """
 
-              success = False
+              # 503 için sınırlı tekrar
+              # 429 için TEKRAR YOK
 
-              for attempt, delay in [
-                  (1, 0),
-                  (2, 5),
-                  (3, 10),
-                  (4, 20)
-              ]:
+              result = None
 
-                  if delay:
-                      time.sleep(delay)
+              for attempt in range(3):
 
                   try:
 
-                      print(
-                          f"Gemini denemesi "
-                          f"{attempt}/4..."
-                      )
+                      print(f"Gemini denemesi: {attempt + 1}")
 
                       result = client.models.generate_content(
-                          model="gemini-3.6-flash",
+                          model=MODEL,
                           contents=prompt
                       )
 
-                      print(
-                          "\nGEMINI SONUCU:\n"
-                      )
+                      successful += 1
 
-                      print(
-                          result.text
-                      )
-
-                      success = True
+                      print()
+                      print(result.text)
 
                       break
 
                   except Exception as e:
 
-                      print(
-                          "Gemini hatası:",
-                          e
-                      )
+                      error = str(e)
 
-              if not success:
+                      # --------------------------------
+                      # 429 = kota doldu
+                      # --------------------------------
 
-                  print(
-                      "Bu haber için Gemini "
-                      "analizi başarısız."
-                  )
+                      if "429" in error or "RESOURCE_EXHAUSTED" in error:
 
-          print("\n" + "=" * 70)
-          print("TEST TAMAMLANDI")
-          print("=" * 70)
+                          print()
+                          print("⚠️ GEMINI KOTASI DOLDU.")
+                          print("Bu haber atlanıyor.")
+                          print("429 hatasında tekrar denenmeyecek.")
+
+                          quota_hit = True
+                          break
+
+                      # --------------------------------
+                      # 503 = geçici sunucu problemi
+                      # --------------------------------
+
+                      if "503" in error or "UNAVAILABLE" in error:
+
+                          if attempt < 2:
+
+                              wait = 5 * (2 ** attempt)
+
+                              print(
+                                  f"Gemini geçici olarak kullanılamıyor."
+                              )
+                              print(
+                                  f"{wait} saniye sonra tekrar denenecek."
+                              )
+
+                              time.sleep(wait)
+
+                              continue
+
+                          print("503 hatası: tekrar hakkı bitti.")
+                          break
+
+                      # --------------------------------
+                      # Diğer hatalar
+                      # --------------------------------
+
+                      print("Gemini hatası:")
+                      print(error)
+                      break
+
+              if quota_hit:
+                  print()
+                  print("Kota nedeniyle kalan haberler atlanıyor.")
+                  break
+
+          # ----------------------------------------
+          # 5. Sonuç
+          # ----------------------------------------
+
+          print()
+          print("========================================")
+          print("TEST SONUCU")
+          print("========================================")
+          print(f"Başarılı Gemini analizi: {successful}")
+          print(f"Toplam haber: {len(article_urls)}")
+
+          if quota_hit:
+              print("Durum: GEMINI KOTASI DOLDU")
+          else:
+              print("Durum: TEST TAMAMLANDI")
+
+          print("========================================")
           PY
-
-          python webproof_test.py
