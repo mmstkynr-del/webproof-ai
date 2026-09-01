@@ -5,6 +5,10 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from openai import OpenAI
 
+# ============================================================
+# WEBPROOF AI - BBC + NVIDIA
+# ============================================================
+
 BASE_URL = "https://www.bbc.com/turkce"
 MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
 
@@ -14,24 +18,32 @@ client = OpenAI(
 )
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0"
+    "User-Agent": "Mozilla/5.0 (WebProof AI)"
 }
 
 
+# ============================================================
+# BBC HABER LİNKLERİNİ BUL
+# ============================================================
+
 def get_article_urls():
+
     response = requests.get(
         BASE_URL,
         headers=HEADERS,
-        timeout=15
+        timeout=20
     )
 
     print(f"BBC HTTP: {response.status_code}")
+
+    response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
 
     urls = []
 
     for a in soup.find_all("a", href=True):
+
         url = urljoin(BASE_URL, a["href"])
         parsed = urlparse(url)
 
@@ -39,6 +51,7 @@ def get_article_urls():
             continue
 
         if parsed.path.startswith("/turkce/articles/"):
+
             clean_url = f"https://www.bbc.com{parsed.path}"
 
             if clean_url not in urls:
@@ -47,18 +60,25 @@ def get_article_urls():
     return urls
 
 
+# ============================================================
+# HABER METNİNİ TEMİZLE
+# ============================================================
+
 def extract_article(url):
+
     response = requests.get(
         url,
         headers=HEADERS,
-        timeout=15
+        timeout=20
     )
 
     if response.status_code != 200:
+        print(f"Haber HTTP: {response.status_code}")
         return None
 
     soup = BeautifulSoup(response.text, "html.parser")
 
+    # Gereksiz HTML bölümlerini kaldır
     for tag in soup([
         "script",
         "style",
@@ -73,6 +93,7 @@ def extract_article(url):
     ]):
         tag.decompose()
 
+    # Ana içerik
     main = soup.find("main")
 
     if not main:
@@ -81,69 +102,123 @@ def extract_article(url):
     if not main:
         return None
 
+    # Başlık
     title = ""
 
     if soup.title:
         title = soup.title.get_text(" ", strip=True)
 
+    # Paragrafları al
     paragraphs = []
 
     for p in main.find_all("p"):
+
         text = p.get_text(" ", strip=True)
+
         text = re.sub(r"\s+", " ", text)
 
-        if len(text) >= 25:
-            if text not in paragraphs:
-                paragraphs.append(text)
+        # Çok kısa metinleri alma
+        if len(text) < 25:
+            continue
+
+        # Tekrarları kaldır
+        if text not in paragraphs:
+            paragraphs.append(text)
 
     body = "\n\n".join(paragraphs)
 
     if not body:
         return None
 
+    # Maksimum metin uzunluğu
+    body = body[:12000]
+
     return {
         "title": title,
-        "text": body[:12000]
+        "text": body
     }
 
 
+# ============================================================
+# NVIDIA ANALİZİ
+# ============================================================
+
 def analyze_with_nvidia(article):
+
     prompt = f"""
-Sen profesyonel bir Türkçe haber editörüsün.
+Aşağıdaki Türkçe haber metnini profesyonel bir haber editörü
+gibi kontrol et.
 
-Aşağıdaki haber metnini kontrol et.
+SADECE şu hataları bildir:
 
-YALNIZCA:
-- açık yazım hataları
-- açık noktalama hataları
-- açık dilbilgisi hataları
-- bariz harf hataları
-- bariz boşluk hataları
+- Kesin yazım hataları
+- Kesin noktalama hataları
+- Kesin dilbilgisi hataları
+- Açık harf/klavye hataları
+- Açık boşluk hataları
 
-tespit et.
+ÇOK ÖNEMLİ:
 
-ÖNEMLİ KURALLAR:
+Emin olmadığın hiçbir şeyi hata olarak bildirme.
 
-1. Emin olmadığın ifadeyi HATA olarak gösterme.
-2. Haber dilini gereksiz yere değiştirme.
-3. Siyasi anlamı değiştirme.
-4. Hukuki anlamı değiştirme.
-5. Ekonomik anlamı değiştirme.
-6. Kişi isimlerini değiştirme.
-7. Kurum isimlerini değiştirme.
-8. Yer isimlerini değiştirme.
-9. Sadece açıkça hatalı olduğundan emin olduğun noktaları bildir.
+Stil tercihi olan ifadeleri hata olarak bildirme.
 
-Her hata için:
+Cümleyi daha güzel hale getirmek için değiştirme.
+
+Gazetecilik üslubunu değiştirme.
+
+Siyasi anlamı değiştirme.
+
+Hukuki anlamı değiştirme.
+
+Ekonomik anlamı değiştirme.
+
+Kişi isimlerini değiştirme.
+
+Kurum isimlerini değiştirme.
+
+Yer isimlerini değiştirme.
+
+Özel isimleri düzeltmeye çalışma.
+
+Bir ifade sadece daha iyi yazılabilir diye hata olarak gösterme.
+
+Yalnızca gerçekten yanlış olduğundan emin olduğun noktaları bildir.
+
+ÇIKTI KURALI:
+
+Kesin hata varsa yalnızca şu formatı kullan:
 
 HATA
 Orijinal: ...
 Öneri: ...
 Açıklama: ...
 
-Hiç açık hata yoksa:
+HATA
+Orijinal: ...
+Öneri: ...
+Açıklama: ...
+
+Birden fazla hata varsa aynı formatı tekrar et.
+
+Kesin hata yoksa yalnızca:
 
 HATA YOK
+
+yaz.
+
+ASLA şunları yazma:
+
+- düşünme süreci
+- analiz süreci
+- reasoning
+- thinking process
+- adım adım değerlendirme
+- "Let's analyze"
+- "The user wants"
+- İngilizce açıklama
+
+SADECE nihai editör sonucunu ver.
 
 HABER BAŞLIĞI:
 {article["title"]}
@@ -153,14 +228,17 @@ HABER METNİ:
 """
 
     response = client.chat.completions.create(
+
         model=MODEL,
+
         messages=[
             {
                 "role": "system",
                 "content": (
-                    "Sen çok dikkatli ve muhafazakâr "
-                    "bir Türkçe haber editörüsün. "
-                    "Yalnızca kesin hataları bildir."
+                    "Sen yalnızca nihai editör sonucunu veren "
+                    "profesyonel bir Türkçe haber editörüsün. "
+                    "İç düşünme veya reasoning metni üretme. "
+                    "Sadece kesin hataları bildir."
                 )
             },
             {
@@ -168,66 +246,109 @@ HABER METNİ:
                 "content": prompt
             }
         ],
+
         temperature=0.1,
-        top_p=0.95,
-        max_tokens=4000,
-        stream=False
+
+        top_p=0.9,
+
+        max_tokens=3000,
+
+        stream=False,
+
+        extra_body={
+            "chat_template_kwargs": {
+                "enable_thinking": False
+            }
+        }
     )
 
     return response.choices[0].message.content
 
 
+# ============================================================
+# ANA PROGRAM
+# ============================================================
+
+print()
 print("========================================")
 print("WEBPROOF AI")
 print("BBC + NVIDIA GERÇEK HABER TESTİ")
 print("========================================")
+print()
 
-urls = get_article_urls()
+try:
 
-print(f"Bulunan haber bağlantısı: {len(urls)}")
+    urls = get_article_urls()
 
-urls = urls[:5]
+    print(f"Bulunan haber bağlantısı: {len(urls)}")
 
-successful = 0
+    # Şimdilik sadece 5 haber
+    urls = urls[:5]
 
-for index, url in enumerate(urls, 1):
+    successful = 0
+
+    for index, url in enumerate(urls, 1):
+
+        print()
+        print("========================================")
+        print(f"HABER {index}/{len(urls)}")
+        print("========================================")
+        print(url)
+
+        try:
+
+            article = extract_article(url)
+
+            if not article:
+                print("❌ Haber metni alınamadı.")
+                continue
+
+            print(f"Başlık: {article['title']}")
+            print(f"Metin uzunluğu: {len(article['text'])} karakter")
+
+            print()
+            print("NVIDIA analiz ediyor...")
+
+            result = analyze_with_nvidia(article)
+
+            successful += 1
+
+            print()
+            print("NVIDIA SONUCU")
+            print("----------------------------------------")
+            print(result)
+
+        except Exception as e:
+
+            error_text = str(e)
+
+            print()
+            print("❌ NVIDIA/HABER HATASI")
+            print("----------------------------------------")
+            print(error_text)
+
+            if "429" in error_text:
+
+                print()
+                print("⚠️ NVIDIA kota/limit nedeniyle bu haber analiz edilemedi.")
+
+            elif "410" in error_text:
+
+                print()
+                print("⚠️ NVIDIA modeli artık kullanılamıyor.")
 
     print()
     print("========================================")
-    print(f"HABER {index}/{len(urls)}")
+    print("TEST SONUCU")
     print("========================================")
-    print(url)
+    print(f"Başarılı analiz: {successful}")
+    print(f"Toplam haber: {len(urls)}")
+    print("========================================")
 
-    try:
+except Exception as e:
 
-        article = extract_article(url)
-
-        if not article:
-            print("Haber metni alınamadı.")
-            continue
-
-        print(f"Başlık: {article['title']}")
-        print(f"Metin uzunluğu: {len(article['text'])} karakter")
-
-        result = analyze_with_nvidia(article)
-
-        successful += 1
-
-        print()
-        print("NVIDIA ANALİZİ")
-        print("----------------------------------------")
-        print(result)
-
-    except Exception as e:
-
-        print()
-        print("HATA:")
-        print(str(e))
-
-print()
-print("========================================")
-print("TEST SONUCU")
-print("========================================")
-print(f"Başarılı analiz: {successful}")
-print(f"Toplam haber: {len(urls)}")
-print("========================================")
+    print()
+    print("========================================")
+    print("❌ GENEL HATA")
+    print("========================================")
+    print(str(e))
