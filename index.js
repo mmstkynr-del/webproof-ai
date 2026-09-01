@@ -2,10 +2,6 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // =========================================================
-    // WEBPROOF AI - CRAWLER + NVIDIA AI PROOFREADING
-    // =========================================================
-
     if (url.pathname === "/api/status") {
       return json({
         ok: true,
@@ -17,20 +13,13 @@ export default {
       });
     }
 
-    // =========================================================
-    // SITE SCAN
-    // =========================================================
-
     if (url.pathname === "/api/scan" && request.method === "POST") {
       try {
         const body = await request.json();
         const target = String(body.url || "").trim();
 
         if (!target) {
-          return json({
-            ok: false,
-            error: "URL girilmedi."
-          }, 400);
+          return json({ ok: false, error: "URL girilmedi." }, 400);
         }
 
         let startUrl;
@@ -38,10 +27,7 @@ export default {
         try {
           startUrl = new URL(target);
         } catch {
-          return json({
-            ok: false,
-            error: "Geçerli bir URL girin."
-          }, 400);
+          return json({ ok: false, error: "Geçerli bir URL girin." }, 400);
         }
 
         if (!["http:", "https:"].includes(startUrl.protocol)) {
@@ -83,7 +69,6 @@ export default {
         const queue = [];
         const queued = new Set();
         const visited = new Set();
-
         const articleCandidates = new Map();
 
         function normalizeUrl(raw) {
@@ -120,16 +105,11 @@ export default {
           }
         }
 
-        // =====================================================
-        // ARTICLE DETECTOR
-        // =====================================================
-
         function looksLikeArticle(link) {
           try {
             const u = new URL(link);
             const path = u.pathname.toLowerCase();
 
-            // BBC Türkçe'nin gerçek haber formatı
             if (
               path.startsWith("/turkce/articles/") ||
               path.startsWith("/turkce/article/")
@@ -219,10 +199,6 @@ export default {
           }
         }
 
-        // =====================================================
-        // TEXT CLEANER
-        // =====================================================
-
         function cleanText(html) {
           let text = html;
 
@@ -273,13 +249,8 @@ export default {
             .replace(/&gt;/gi, ">");
 
           text = text.replace(/\u00a0/g, " ");
-
           text = text.replace(/[ \t]+/g, " ");
-
-          text = text.replace(
-            /\n\s*\n+/g,
-            "\n\n"
-          );
+          text = text.replace(/\n\s*\n+/g, "\n\n");
 
           return text.trim();
         }
@@ -295,10 +266,6 @@ export default {
 
           return cleanText(match[1]);
         }
-
-        // =====================================================
-        // LINK EXTRACTION
-        // =====================================================
 
         function extractLinks(html, baseUrl) {
           const links = [];
@@ -328,10 +295,6 @@ export default {
 
           return [...new Set(links)];
         }
-
-        // =====================================================
-        // FETCH PAGE
-        // =====================================================
 
         async function fetchPage(pageUrl) {
           try {
@@ -372,20 +335,15 @@ export default {
           }
         }
 
-        // =====================================================
-        // NVIDIA AI
-        // =====================================================
-
         async function analyzeWithNvidia(title, text) {
-
           if (!env.NVIDIA_API_KEY) {
             return {
               ok: false,
-              error: "NVIDIA_API_KEY Cloudflare Worker'da bulunamadı."
+              error:
+                "NVIDIA_API_KEY Cloudflare Worker'da bulunamadı."
             };
           }
 
-          // Çok uzun metni kontrol altında tut
           const MAX_TEXT = 12000;
 
           const articleText =
@@ -393,58 +351,41 @@ export default {
               ? text.slice(0, MAX_TEXT)
               : text;
 
-          const systemPrompt = `
-Sen WebProof AI adlı profesyonel bir Türkçe web yazım denetim sisteminin yapay zeka motorusun.
-
-Görevin haber metnini incelemek ve SADECE gerçekten hatalı olduğundan yüksek derecede emin olduğun durumları bulmaktır.
-
-Özellikle şunları kontrol et:
-
-1. Yazım yanlışları
-2. Bariz kelime hataları
-3. Harf eksikliği veya fazlalığı
-4. Yanlış birleşik/ayrı yazımlar
-5. Noktalama hataları
-6. Noktalama işaretlerinden önce/sonra yanlış boşluk
-7. Kesme işareti kullanımı
-8. Büyük/küçük harf hataları
-9. Açık ve bariz dilbilgisi hataları
-10. Sayı ve saat yazımındaki açık yazım hataları
-
-ÖNEMLİ:
-
-- Özel isimleri gereksiz yere değiştirme.
-- Haber dilini yeniden yazma.
-- Stil tercihlerine müdahale etme.
-- Anlamı değiştiren öneriler verme.
-- Emin olmadığın bir ifadeyi hata olarak işaretleme.
-- Kaynak metinde olmayan hata üretme.
-- Sadece gerçekten mevcut olan hataları bildir.
-
-ÇIKTIYI SADECE GEÇERLİ JSON OLARAK VER.
-
-Format:
-
-{
-  "errors": [
-    {
-      "original": "hatalı ifade",
-      "correction": "doğru ifade",
-      "type": "yazım|noktalama|dilbilgisi|sayı|diğer",
-      "confidence": 0.0,
-      "reason": "kısa açıklama"
-    }
-  ]
-}
-
-Hata yoksa:
-
-{
-  "errors": []
-}
-
-JSON dışında hiçbir açıklama yazma.
-`;
+          const systemPrompt = [
+            "Sen WebProof AI adlı profesyonel Türkçe web yazım denetim sisteminin yapay zeka motorusun.",
+            "",
+            "Görevin haber metnini incelemek ve SADECE gerçekten hatalı olduğundan yüksek derecede emin olduğun durumları bulmaktır.",
+            "",
+            "Şunları kontrol et:",
+            "1. Yazım yanlışları",
+            "2. Bariz kelime hataları",
+            "3. Harf eksikliği veya fazlalığı",
+            "4. Yanlış birleşik veya ayrı yazımlar",
+            "5. Noktalama hataları",
+            "6. Noktalama işaretlerinden önce veya sonra yanlış boşluk",
+            "7. Kesme işareti kullanımı",
+            "8. Büyük ve küçük harf hataları",
+            "9. Açık ve bariz dilbilgisi hataları",
+            "10. Sayı ve saat yazımındaki açık yazım hataları",
+            "",
+            "ÖNEMLİ:",
+            "- Özel isimleri gereksiz yere değiştirme.",
+            "- Haber dilini yeniden yazma.",
+            "- Stil tercihlerine müdahale etme.",
+            "- Anlamı değiştiren öneriler verme.",
+            "- Emin olmadığın ifadeyi hata olarak işaretleme.",
+            "- Kaynak metinde olmayan hata üretme.",
+            "",
+            "ÇIKTIYI SADECE GEÇERLİ JSON OLARAK VER.",
+            "",
+            "Format:",
+            '{ "errors": [ { "original": "hatalı ifade", "correction": "doğru ifade", "type": "yazım|noktalama|dilbilgisi|sayı|diğer", "confidence": 0.0, "reason": "kısa açıklama" } ] }',
+            "",
+            "Hata yoksa:",
+            '{ "errors": [] }',
+            "",
+            "JSON dışında hiçbir açıklama yazma."
+          ].join("\n");
 
           const userPrompt =
             "HABER BAŞLIĞI:\n" +
@@ -481,7 +422,6 @@ JSON dışında hiçbir açıklama yazma.
                   temperature: 0.1,
                   top_p: 0.9,
                   max_tokens: 4000,
-
                   stream: false,
 
                   extra_body: {
@@ -510,7 +450,8 @@ JSON dışında hiçbir açıklama yazma.
             } catch {
               return {
                 ok: false,
-                error: "NVIDIA cevabı JSON olarak okunamadı.",
+                error:
+                  "NVIDIA cevabı JSON olarak okunamadı.",
                 raw: raw.slice(0, 2000)
               };
             }
@@ -521,11 +462,11 @@ JSON dışında hiçbir açıklama yazma.
             if (!content) {
               return {
                 ok: false,
-                error: "NVIDIA boş cevap döndürdü."
+                error:
+                  "NVIDIA boş cevap döndürdü."
               };
             }
 
-            // Markdown JSON temizleme
             let cleaned = content.trim();
 
             cleaned = cleaned
@@ -534,7 +475,6 @@ JSON dışında hiçbir açıklama yazma.
               .replace(/\s*```$/i, "")
               .trim();
 
-            // JSON bloğunu bulmaya çalış
             const firstBrace =
               cleaned.indexOf("{");
 
@@ -570,7 +510,6 @@ JSON dışında hiçbir açıklama yazma.
               result.errors = [];
             }
 
-            // Güven düşükse gösterme
             result.errors =
               result.errors.filter(error => {
                 const confidence =
@@ -601,10 +540,6 @@ JSON dışında hiçbir açıklama yazma.
           }
         }
 
-        // =====================================================
-        // START
-        // =====================================================
-
         const normalizedStart =
           normalizeUrl(startUrl.toString());
 
@@ -623,10 +558,6 @@ JSON dışında hiçbir açıklama yazma.
         });
 
         queued.add(normalizedStart);
-
-        // =====================================================
-        // HOMEPAGE
-        // =====================================================
 
         const startResult =
           await fetchPage(normalizedStart);
@@ -648,7 +579,6 @@ JSON dışında hiçbir açıklama yazma.
           );
 
         for (const link of homepageLinks) {
-
           const info =
             looksLikeArticle(link);
 
@@ -660,14 +590,10 @@ JSON dışında hiçbir açıklama yazma.
           }
         }
 
-        // =====================================================
-        // ARTICLE QUEUE
-        // =====================================================
-
         const sortedCandidates =
           [...articleCandidates.entries()]
-            .map(([url, info]) => ({
-              url,
+            .map(([articleUrl, info]) => ({
+              url: articleUrl,
               score: info.score,
               type: info.type
             }))
@@ -677,7 +603,6 @@ JSON dışında hiçbir açıklama yazma.
             );
 
         for (const candidate of sortedCandidates) {
-
           if (
             queue.length >=
             MAX_PAGES * 3
@@ -691,12 +616,7 @@ JSON dışında hiçbir açıklama yazma.
           }
         }
 
-        // =====================================================
-        // CRAWL
-        // =====================================================
-
         const pages = [];
-
         let totalCharacters = 0;
         let linksFound =
           homepageLinks.length;
@@ -705,7 +625,6 @@ JSON dışında hiçbir açıklama yazma.
           queue.length > 0 &&
           pages.length < MAX_PAGES
         ) {
-
           queue.sort(
             (a, b) =>
               b.score - a.score
@@ -727,7 +646,6 @@ JSON dışında hiçbir açıklama yazma.
             await fetchPage(item.url);
 
           if (!result.ok) {
-
             pages.push({
               url: item.url,
               type: item.type,
@@ -765,7 +683,6 @@ JSON dışında hiçbir açıklama yazma.
             pageLinks.length;
 
           for (const link of pageLinks) {
-
             if (visited.has(link)) {
               continue;
             }
@@ -774,11 +691,8 @@ JSON dışında hiçbir açıklama yazma.
               looksLikeArticle(link);
 
             if (info.score > 0) {
-
               const old =
-                articleCandidates.get(
-                  link
-                );
+                articleCandidates.get(link);
 
               if (
                 !old ||
@@ -791,7 +705,6 @@ JSON dışında hiçbir açıklama yazma.
               }
 
               if (!queued.has(link)) {
-
                 queue.push({
                   url: link,
                   score: info.score,
@@ -837,10 +750,6 @@ JSON dışında hiçbir açıklama yazma.
             text.length;
         }
 
-        // =====================================================
-        // NVIDIA ANALYSIS
-        // =====================================================
-
         const articlePages =
           pages.filter(
             page =>
@@ -857,14 +766,14 @@ JSON dışında hiçbir açıklama yazma.
         let totalErrors = 0;
 
         for (const page of aiPages) {
-
           const aiResult =
             await analyzeWithNvidia(
               page.title,
               page.text
             );
 
-          page.ai = aiResult;
+          page.ai =
+            aiResult;
 
           if (aiResult.ok) {
             aiAnalyzed += 1;
@@ -873,52 +782,32 @@ JSON dışında hiçbir açıklama yazma.
           }
         }
 
-        // =====================================================
-        // RESPONSE
-        // =====================================================
-
         return json({
           ok: true,
-
-          target:
-            normalizedStart,
-
+          target: normalizedStart,
           domain,
-
           crawler:
             "smart-article-crawler",
-
           ai:
             env.NVIDIA_API_KEY
               ? "nvidia-connected"
               : "missing-api-key",
-
           model:
             "nvidia/nemotron-3.5-lightning-30b-a3b",
-
           pagesScanned:
             pages.length,
-
           pagesLimit:
             MAX_PAGES,
-
           linksFound,
-
           articleCandidates:
             articleCandidates.size,
-
           articlePages:
             articlePages.length,
-
           aiAnalyzed,
-
           aiLimit:
             MAX_ARTICLES_FOR_AI,
-
           totalErrors,
-
           totalCharacters,
-
           readyForAI:
             articlePages.length,
 
@@ -935,7 +824,6 @@ JSON dışında hiçbir açıklama yazma.
         });
 
       } catch (error) {
-
         return json({
           ok: false,
           error:
@@ -947,21 +835,15 @@ JSON dışında hiçbir açıklama yazma.
       }
     }
 
-    // =========================================================
-    // WEBPROOF AI UI
-    // =========================================================
-
     const HTML = `
 <!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>WebProof AI</title>
 
 <style>
-
 * {
   box-sizing: border-box;
 }
@@ -994,11 +876,7 @@ body {
 }
 
 .container {
-  width: min(
-    1100px,
-    calc(100% - 32px)
-  );
-
+  width: min(1100px, calc(100% - 32px));
   margin: 0 auto;
   padding: 60px 0;
 }
@@ -1024,22 +902,12 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-
   margin-top: 22px;
-
   padding: 8px 13px;
-
-  border:
-    1px solid
-    rgba(80,220,150,.25);
-
+  border: 1px solid rgba(80,220,150,.25);
   border-radius: 999px;
-
-  background:
-    rgba(80,220,150,.07);
-
+  background: rgba(80,220,150,.07);
   color: #70e0a5;
-
   font-size: 13px;
 }
 
@@ -1047,39 +915,23 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-
   background: #55df91;
-
-  box-shadow:
-    0 0 12px #55df91;
+  box-shadow: 0 0 12px #55df91;
 }
 
 .card {
   margin-top: 34px;
   padding: 26px;
-
-  border:
-    1px solid
-    rgba(255,255,255,.09);
-
+  border: 1px solid rgba(255,255,255,.09);
   border-radius: 22px;
-
-  background:
-    rgba(17,23,37,.78);
-
-  backdrop-filter:
-    blur(18px);
-
-  box-shadow:
-    0 20px 70px
-    rgba(0,0,0,.35);
+  background: rgba(17,23,37,.78);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 70px rgba(0,0,0,.35);
 }
 
 .label {
   display: block;
-
   margin-bottom: 10px;
-
   font-size: 13px;
   color: #aeb9cc;
 }
@@ -1092,110 +944,65 @@ body {
 input {
   flex: 1;
   min-width: 0;
-
-  padding:
-    17px 18px;
-
-  border:
-    1px solid
-    rgba(255,255,255,.10);
-
+  padding: 17px 18px;
+  border: 1px solid rgba(255,255,255,.10);
   border-radius: 13px;
-
   outline: none;
-
   background: #0b101c;
   color: white;
-
   font-size: 15px;
 }
 
 input:focus {
   border-color: #6d8cff;
-
-  box-shadow:
-    0 0 0 3px
-    rgba(109,140,255,.12);
+  box-shadow: 0 0 0 3px rgba(109,140,255,.12);
 }
 
 button {
   border: 0;
   border-radius: 13px;
-
   padding: 0 25px;
-
-  background:
-    linear-gradient(
-      135deg,
-      #607cff,
-      #795cff
-    );
-
+  background: linear-gradient(135deg, #607cff, #795cff);
   color: white;
-
   font-weight: 800;
-
   cursor: pointer;
-
   transition: .2s;
 }
 
 button:hover {
-  transform:
-    translateY(-1px);
-
-  filter:
-    brightness(1.08);
+  transform: translateY(-1px);
+  filter: brightness(1.08);
 }
 
 button:disabled {
   opacity: .55;
   cursor: not-allowed;
-
   transform: none;
 }
 
 .status-box {
   display: none;
-
   margin-top: 20px;
   padding: 16px;
-
   border-radius: 13px;
-
   background: #0b101c;
-
-  border:
-    1px solid
-    rgba(255,255,255,.08);
-
+  border: 1px solid rgba(255,255,255,.08);
   color: #b9c3d6;
-
   line-height: 1.6;
 }
 
 .stats {
   display: grid;
-
-  grid-template-columns:
-    repeat(5, 1fr);
-
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
-
   margin-top: 20px;
 }
 
 .stat {
   padding: 18px;
-
   border-radius: 15px;
-
-  background:
-    rgba(255,255,255,.035);
-
-  border:
-    1px solid
-    rgba(255,255,255,.06);
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.06);
 }
 
 .stat-value {
@@ -1205,9 +1012,7 @@ button:disabled {
 
 .stat-label {
   margin-top: 5px;
-
   color: #8e9ab0;
-
   font-size: 12px;
 }
 
@@ -1217,10 +1022,7 @@ button:disabled {
 
 .page {
   padding: 18px 0;
-
-  border-bottom:
-    1px solid
-    rgba(255,255,255,.06);
+  border-bottom: 1px solid rgba(255,255,255,.06);
 }
 
 .page:last-child {
@@ -1235,72 +1037,48 @@ button:disabled {
 
 .page-url {
   margin-top: 6px;
-
   color: #77849c;
-
   font-size: 12px;
-
   word-break: break-all;
 }
 
 .badges {
   display: flex;
   flex-wrap: wrap;
-
   gap: 7px;
-
   margin-top: 9px;
 }
 
 .badge {
-  padding:
-    4px 8px;
-
+  padding: 4px 8px;
   border-radius: 7px;
-
   font-size: 11px;
-
-  background:
-    rgba(109,140,255,.10);
-
+  background: rgba(109,140,255,.10);
   color: #91a5ff;
 }
 
 .badge.article {
-  background:
-    rgba(80,220,150,.10);
-
+  background: rgba(80,220,150,.10);
   color: #70e0a5;
 }
 
 .badge.error {
-  background:
-    rgba(255,80,100,.12);
-
+  background: rgba(255,80,100,.12);
   color: #ff8b99;
 }
 
 .ai-box {
   margin-top: 15px;
-
   padding: 16px;
-
   border-radius: 14px;
-
-  background:
-    rgba(109,140,255,.055);
-
-  border:
-    1px solid
-    rgba(109,140,255,.12);
+  background: rgba(109,140,255,.055);
+  border: 1px solid rgba(109,140,255,.12);
 }
 
 .ai-title {
   font-size: 13px;
   font-weight: 800;
-
   color: #a9b8ff;
-
   margin-bottom: 10px;
 }
 
@@ -1311,10 +1089,7 @@ button:disabled {
 
 .error-item {
   padding: 12px 0;
-
-  border-top:
-    1px solid
-    rgba(255,255,255,.06);
+  border-top: 1px solid rgba(255,255,255,.06);
 }
 
 .error-original {
@@ -1334,33 +1109,24 @@ button:disabled {
 
 .error-reason {
   margin-top: 5px;
-
   color: #8f9bb0;
-
   font-size: 12px;
 }
 
 .footer {
   margin-top: 35px;
-
   text-align: center;
-
   color: #647086;
-
   font-size: 12px;
 }
 
 @media (max-width: 850px) {
-
   .stats {
-    grid-template-columns:
-      repeat(2, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
-
 }
 
 @media (max-width: 700px) {
-
   .container {
     padding: 35px 0;
   }
@@ -1376,9 +1142,7 @@ button:disabled {
   button {
     height: 52px;
   }
-
 }
-
 </style>
 </head>
 
@@ -1414,7 +1178,7 @@ button:disabled {
         type="url"
         placeholder="https://www.bbc.com/turkce"
         value="https://www.bbc.com/turkce"
-      />
+      >
 
       <button
         id="scanBtn"
@@ -1425,10 +1189,7 @@ button:disabled {
 
     </div>
 
-    <div
-      id="statusBox"
-      class="status-box">
-    </div>
+    <div id="statusBox" class="status-box"></div>
 
     <div
       id="stats"
@@ -1437,77 +1198,38 @@ button:disabled {
     >
 
       <div class="stat">
-        <div
-          id="pagesScanned"
-          class="stat-value">
-          0
-        </div>
-
-        <div class="stat-label">
-          Taranan sayfa
-        </div>
+        <div id="pagesScanned" class="stat-value">0</div>
+        <div class="stat-label">Taranan sayfa</div>
       </div>
 
       <div class="stat">
-        <div
-          id="linksFound"
-          class="stat-value">
-          0
-        </div>
-
-        <div class="stat-label">
-          Bulunan bağlantı
-        </div>
+        <div id="linksFound" class="stat-value">0</div>
+        <div class="stat-label">Bulunan bağlantı</div>
       </div>
 
       <div class="stat">
-        <div
-          id="articlePages"
-          class="stat-value">
-          0
-        </div>
-
-        <div class="stat-label">
-          Haber / makale
-        </div>
+        <div id="articlePages" class="stat-value">0</div>
+        <div class="stat-label">Haber / makale</div>
       </div>
 
       <div class="stat">
-        <div
-          id="aiAnalyzed"
-          class="stat-value">
-          0
-        </div>
-
-        <div class="stat-label">
-          AI analiz
-        </div>
+        <div id="aiAnalyzed" class="stat-value">0</div>
+        <div class="stat-label">AI analiz</div>
       </div>
 
       <div class="stat">
-        <div
-          id="totalErrors"
-          class="stat-value">
-          0
-        </div>
-
-        <div class="stat-label">
-          Tespit edilen hata
-        </div>
+        <div id="totalErrors" class="stat-value">0</div>
+        <div class="stat-label">Tespit edilen hata</div>
       </div>
 
     </div>
 
-    <div
-      id="results"
-      class="results">
-    </div>
+    <div id="results" class="results"></div>
 
   </div>
 
   <div class="footer">
-    WebProof AI · AI destekli
-    web içerik kontrol sistemi
+    WebProof AI · AI destekli web içerik kontrol sistemi
   </div>
 
 </div>
@@ -1535,30 +1257,21 @@ async function scanSite() {
     input.value.trim();
 
   if (!target) {
-
-    statusBox.style.display =
-      "block";
-
+    statusBox.style.display = "block";
     statusBox.textContent =
       "Lütfen bir web sitesi adresi girin.";
-
     return;
   }
 
   button.disabled = true;
-
   button.textContent =
     "AI ANALİZ EDİYOR...";
 
-  statusBox.style.display =
-    "block";
-
+  statusBox.style.display = "block";
   statusBox.textContent =
-    "Site taranıyor ve gerçek haber metinleri NVIDIA yapay zekâsı tarafından kontrol ediliyor...";
+    "Site taranıyor ve haberler NVIDIA yapay zekâsı tarafından kontrol ediliyor...";
 
-  stats.style.display =
-    "none";
-
+  stats.style.display = "none";
   results.innerHTML = "";
 
   try {
@@ -1568,12 +1281,10 @@ async function scanSite() {
         "/api/scan",
         {
           method: "POST",
-
           headers: {
             "Content-Type":
               "application/json"
           },
-
           body: JSON.stringify({
             url: target
           })
@@ -1593,8 +1304,7 @@ async function scanSite() {
     statusBox.textContent =
       "Tarama ve NVIDIA AI analizi tamamlandı.";
 
-    stats.style.display =
-      "grid";
+    stats.style.display = "grid";
 
     document.getElementById(
       "pagesScanned"
@@ -1626,12 +1336,9 @@ async function scanSite() {
     for (const page of data.pages) {
 
       const div =
-        document.createElement(
-          "div"
-        );
+        document.createElement("div");
 
-      div.className =
-        "page";
+      div.className = "page";
 
       const safeTitle =
         page.title ||
@@ -1644,51 +1351,58 @@ async function scanSite() {
 
       let html = "";
 
-      html += `
-        <div class="page-title">
-          ${escapeHtml(safeTitle)}
-        </div>
+      html +=
+        '<div class="page-title">' +
+        escapeHtml(safeTitle) +
+        '</div>';
 
-        <div class="page-url">
-          ${escapeHtml(page.url)}
-        </div>
+      html +=
+        '<div class="page-url">' +
+        escapeHtml(page.url) +
+        '</div>';
 
-        <div class="badges">
+      html +=
+        '<div class="badges">';
 
-          <span class="badge">
-            HTTP ${page.status}
-          </span>
+      html +=
+        '<span class="badge">HTTP ' +
+        page.status +
+        '</span>';
 
-          <span class="badge ${
-            page.type === "article"
-              ? "article"
-              : ""
-          }">
-            ${typeLabel}
-          </span>
+      html +=
+        '<span class="badge ' +
+        (
+          page.type === "article"
+            ? "article"
+            : ""
+        ) +
+        '">' +
+        typeLabel +
+        '</span>';
 
-          <span class="badge">
-            Skor ${page.score}
-          </span>
+      html +=
+        '<span class="badge">Skor ' +
+        page.score +
+        '</span>';
 
-          <span class="badge">
-            ${Number(page.chars)
-              .toLocaleString("tr-TR")}
-            karakter
-          </span>
+      html +=
+        '<span class="badge">' +
+        Number(page.chars)
+          .toLocaleString("tr-TR") +
+        ' karakter</span>';
 
-        </div>
-      `;
+      html +=
+        '</div>';
 
       if (page.ai) {
 
-        html += `
-          <div class="ai-box">
+        html +=
+          '<div class="ai-box">';
 
-            <div class="ai-title">
-              🤖 NVIDIA AI ANALİZİ
-            </div>
-        `;
+        html +=
+          '<div class="ai-title">' +
+          '🤖 NVIDIA AI ANALİZİ' +
+          '</div>';
 
         if (page.ai.ok) {
 
@@ -1702,78 +1416,75 @@ async function scanSite() {
               of page.ai.errors
             ) {
 
-              html += `
-                <div class="error-item">
+              html +=
+                '<div class="error-item">';
 
-                  <span class="error-original">
-                    ${escapeHtml(
-                      error.original
-                    )}
-                  </span>
+              html +=
+                '<span class="error-original">' +
+                escapeHtml(
+                  error.original
+                ) +
+                '</span>';
 
-                  <span class="error-arrow">
-                    →
-                  </span>
+              html +=
+                '<span class="error-arrow">' +
+                '→' +
+                '</span>';
 
-                  <span class="error-correction">
-                    ${escapeHtml(
-                      error.correction
-                    )}
-                  </span>
+              html +=
+                '<span class="error-correction">' +
+                escapeHtml(
+                  error.correction
+                ) +
+                '</span>';
 
-                  <div class="error-reason">
-                    ${escapeHtml(
-                      error.reason ||
-                      "Yazım denetimi"
-                    )}
+              html +=
+                '<div class="error-reason">' +
+                escapeHtml(
+                  error.reason ||
+                  "Yazım denetimi"
+                ) +
+                ' · Güven: ' +
+                Math.round(
+                  Number(
+                    error.confidence
+                  ) * 100
+                ) +
+                '%</div>';
 
-                    · Güven:
-                    ${Math.round(
-                      Number(
-                        error.confidence
-                      ) * 100
-                    )}%
-                  </div>
-
-                </div>
-              `;
+              html +=
+                '</div>';
             }
 
           } else {
 
-            html += `
-              <div class="ai-ok">
-                ✓ AI tarafından
-                yüksek güvenle hata
-                tespit edilmedi.
-              </div>
-            `;
+            html +=
+              '<div class="ai-ok">' +
+              '✓ AI tarafından yüksek güvenle ' +
+              'hata tespit edilmedi.' +
+              '</div>';
           }
 
         } else {
 
-          html += `
-            <div class="badge error">
-              AI hatası:
-              ${escapeHtml(
-                page.ai.error ||
-                "Bilinmeyen hata"
-              )}
-            </div>
-          `;
+          html +=
+            '<div class="badge error">' +
+            'AI hatası: ' +
+            escapeHtml(
+              page.ai.error ||
+              "Bilinmeyen hata"
+            ) +
+            '</div>';
         }
 
-        html += `
-          </div>
-        `;
+        html +=
+          '</div>';
       }
 
       div.innerHTML =
         html;
 
-      results.appendChild(
-        div
-      );
+      results.appendChild(div);
     }
 
   } catch (error) {
@@ -1784,8 +1495,7 @@ async function scanSite() {
 
   } finally {
 
-    button.disabled =
-      false;
+    button.disabled = false;
 
     button.textContent =
       "SİTEYİ TARA";
@@ -1795,26 +1505,11 @@ async function scanSite() {
 function escapeHtml(value) {
 
   return String(value)
-    .replace(
-      /&/g,
-      "&amp;"
-    )
-    .replace(
-      /</g,
-      "&lt;"
-    )
-    .replace(
-      />/g,
-      "&gt;"
-    )
-    .replace(
-      /"/g,
-      "&quot;"
-    )
-    .replace(
-      /'/g,
-      "&#039;"
-    );
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 </script>
@@ -1845,11 +1540,9 @@ function json(data, status = 200) {
     ),
     {
       status,
-
       headers: {
         "content-type":
           "application/json;charset=UTF-8",
-
         "access-control-allow-origin":
           "*"
       }
