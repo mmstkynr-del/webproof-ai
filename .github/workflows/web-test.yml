@@ -1,16 +1,57 @@
-name: WebProof AI Test
+name: WebProof AI - BBC Bağlantı Testi
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  bbc-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test
+      - name: BBC Türkçe bağlantısını test et
         run: |
-          echo "================================"
-          echo "WEBPROOF AI ACTIONS ÇALIŞIYOR"
-          echo "================================"
-          echo "GitHub Actions bağlantısı başarılı."
+          python - <<'PY'
+          import urllib.request
+
+          url = "https://www.bbc.com/turkce"
+
+          print("======================================")
+          print("WEBPROOF AI - BBC TÜRKÇE TESTİ")
+          print("======================================")
+          print("Adres:", url)
+          print("")
+
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "User-Agent": "Mozilla/5.0"
+              }
+          )
+
+          try:
+              with urllib.request.urlopen(
+                  request,
+                  timeout=30
+              ) as response:
+
+                  html = response.read().decode(
+                      "utf-8",
+                      errors="ignore"
+                  )
+
+                  print("BAĞLANTI BAŞARILI")
+                  print("HTTP:", response.status)
+                  print("HTML karakter sayısı:", len(html))
+                  print("")
+                  print("BBC Türkçe'ye erişilebiliyor.")
+
+          except Exception as error:
+              print("BBC bağlantısı başarısız.")
+              print("HATA:", error)
+              raise
+
+          print("")
+          print("======================================")
+          print("TEST TAMAMLANDI")
+          print("======================================")
+          PY
