@@ -5,12 +5,18 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from openai import OpenAI
 
+
 # ============================================================
-# WEBPROOF AI - GELİŞMİŞ KURAL MOTORU + NVIDIA
+# WEBPROOF AI
+# GELİŞMİŞ KURAL MOTORU + NVIDIA
+# ÇIKTI KONTROLLÜ SÜRÜM
 # ============================================================
 
 BASE_URL = "https://www.bbc.com/turkce"
+
 MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
+
+MAX_ARTICLES = 5
 
 client = OpenAI(
     base_url="https://integrate.api.nvidia.com/v1",
@@ -23,227 +29,7 @@ HEADERS = {
 
 
 # ============================================================
-# KURAL MOTORU
-# ============================================================
-
-def rule_check(text):
-
-    errors = []
-
-    # --------------------------------------------------------
-    # ANALİZ DIŞI BÖLGELER
-    #
-    # URL, e-posta, kod vb. bölümleri koruyoruz.
-    # --------------------------------------------------------
-
-    protected = []
-
-    def protect(match):
-        protected.append(match.group(0))
-        return f"___WEBPROOF_PROTECTED_{len(protected)-1}___"
-
-    working_text = re.sub(
-        r"https?://[^\s]+|www\.[^\s]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}",
-        protect,
-        text
-    )
-
-    # --------------------------------------------------------
-    # 1. NOKTALAMA İŞARETİNDEN ÖNCE GEREKSİZ BOŞLUK
-    #
-    # Örnek:
-    # "söylemişti ." -> "söylemişti."
-    #
-    # Ancak:
-    # ". . ." gibi yapıları ve URL'leri koruyoruz.
-    # --------------------------------------------------------
-
-    pattern = r"(?<!\.)\s+([,!?;:])"
-
-    for match in re.finditer(pattern, working_text):
-
-        original = match.group(0)
-        punctuation = match.group(1)
-
-        errors.append({
-            "type": "noktalama öncesi boşluk",
-            "original": original,
-            "suggestion": punctuation,
-            "context": get_context(
-                working_text,
-                match.start(),
-                match.end()
-            )
-        })
-
-    # --------------------------------------------------------
-    # 2. NOKTALAMA SONRASI EKSİK BOŞLUK
-    #
-    # ".Merhaba" -> ". Merhaba"
-    #
-    # ÖNEMLİ:
-    # .M / .S gibi baş harfli kişi kısaltmalarını atlıyoruz.
-    # --------------------------------------------------------
-
-    pattern = r"([.!?,;:])([A-Za-zÇĞİÖŞÜçğıöşü])"
-
-    for match in re.finditer(pattern, working_text):
-
-        punctuation = match.group(1)
-        letter = match.group(2)
-
-        # Kişi baş harfi:
-        # Ö.M.
-        # Ö.S.
-        # A.B.
-        if punctuation == "." and letter.isupper():
-
-            before = working_text[max(0, match.start()-2):match.start()]
-
-            if re.search(
-                r"[A-ZÇĞİÖŞÜ]\.",
-                before
-            ):
-                continue
-
-        # Kısaltma benzeri durumlar
-        if punctuation == "." and letter.isupper():
-            continue
-
-        errors.append({
-            "type": "noktalama sonrası eksik boşluk",
-            "original": match.group(0),
-            "suggestion": punctuation + " " + letter,
-            "context": get_context(
-                working_text,
-                match.start(),
-                match.end()
-            )
-        })
-
-    # --------------------------------------------------------
-    # 3. KELİME + SAYI BİRLEŞMESİ
-    #
-    # araçlarının10 -> araçlarının 10
-    # --------------------------------------------------------
-
-    pattern = r"([A-Za-zÇĞİÖŞÜçğıöşü])(\d+)"
-
-    for match in re.finditer(pattern, working_text):
-
-        original = match.group(0)
-
-        letter = match.group(1)
-        number = match.group(2)
-
-        # Tarih benzeri yapıları atla
-        if re.search(
-            r"\d{1,4}$",
-            number
-        ):
-
-            # Yıl gibi 2026 vb.
-            if len(number) == 4:
-                continue
-
-        errors.append({
-            "type": "kelime-sayı birleşmesi",
-            "original": original,
-            "suggestion": letter + " " + number,
-            "context": get_context(
-                working_text,
-                match.start(),
-                match.end()
-            )
-        })
-
-    # --------------------------------------------------------
-    # 4. SAYI + KELİME BİRLEŞMESİ
-    #
-    # 10kişi -> 10 kişi
-    # --------------------------------------------------------
-
-    pattern = r"(\d)([A-Za-zÇĞİÖŞÜçğıöşü])"
-
-    for match in re.finditer(pattern, working_text):
-
-        number = match.group(1)
-        letter = match.group(2)
-
-        # Saatleri koru
-        before = working_text[
-            max(0, match.start()-3):
-            match.start()+3
-        ]
-
-        if ":" in before:
-            continue
-
-        errors.append({
-            "type": "sayı-kelime birleşmesi",
-            "original": match.group(0),
-            "suggestion": number + " " + letter,
-            "context": get_context(
-                working_text,
-                match.start(),
-                match.end()
-            )
-        })
-
-    # --------------------------------------------------------
-    # 5. YURT DIŞI YAZIMI
-    # --------------------------------------------------------
-
-    patterns = [
-        (r"\byurtdışına\b", "yurt dışına"),
-        (r"\byurtdışında\b", "yurt dışında"),
-        (r"\byurtdışından\b", "yurt dışından"),
-        (r"\byurtdışı\b", "yurt dışı")
-    ]
-
-    for pattern, suggestion in patterns:
-
-        for match in re.finditer(
-            pattern,
-            working_text,
-            flags=re.IGNORECASE
-        ):
-
-            errors.append({
-                "type": "kesin yazım hatası",
-                "original": match.group(0),
-                "suggestion": suggestion,
-                "context": get_context(
-                    working_text,
-                    match.start(),
-                    match.end()
-                )
-            })
-
-    # --------------------------------------------------------
-    # 6. PARAGRAF BOŞLUKLARI KONTROL EDİLMİYOR
-    #
-    # \n\n normaldir.
-    #
-    # Önceki sürümdeki 100+ sahte bulgunun ana nedeni buydu.
-    # --------------------------------------------------------
-
-    # --------------------------------------------------------
-    # KORUNAN URL / E-POSTALARI GERİ KOY
-    # --------------------------------------------------------
-
-    for index, original in enumerate(protected):
-
-        working_text = working_text.replace(
-            f"___WEBPROOF_PROTECTED_{index}___",
-            original
-        )
-
-    return remove_duplicate_errors(errors)
-
-
-# ============================================================
-# BAĞLAM AL
+# BAĞLAM
 # ============================================================
 
 def get_context(text, start, end):
@@ -272,7 +58,7 @@ def get_context(text, start, end):
 
 
 # ============================================================
-# AYNI HATALARI TEKRAR ETME
+# TEKRARLARI TEMİZLE
 # ============================================================
 
 def remove_duplicate_errors(errors):
@@ -301,7 +87,271 @@ def remove_duplicate_errors(errors):
 
 
 # ============================================================
-# BBC HABER LİNKLERİNİ BUL
+# KURAL MOTORU
+# ============================================================
+
+def rule_check(text):
+
+    errors = []
+
+    protected = []
+
+    # --------------------------------------------------------
+    # URL / E-MAIL KORUMA
+    # --------------------------------------------------------
+
+    def protect(match):
+
+        protected.append(
+            match.group(0)
+        )
+
+        return (
+            f"___WEBPROOF_URL_"
+            f"{len(protected)-1}___"
+        )
+
+    working_text = re.sub(
+        r"https?://[^\s]+|www\.[^\s]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}",
+        protect,
+        text
+    )
+
+    # --------------------------------------------------------
+    # 1. NOKTALAMA ÖNCESİ BOŞLUK
+    #
+    # "burada ." -> "burada."
+    #
+    # Sadece normal boşlukları kontrol ediyoruz.
+    # Satır/paragraf sonlarını kontrol etmiyoruz.
+    # --------------------------------------------------------
+
+    pattern = r"[ \t]+([,!?;:])"
+
+    for match in re.finditer(
+        pattern,
+        working_text
+    ):
+
+        punctuation = match.group(1)
+
+        errors.append({
+            "type": "noktalama öncesi boşluk",
+            "original": match.group(0),
+            "suggestion": punctuation,
+            "context": get_context(
+                working_text,
+                match.start(),
+                match.end()
+            )
+        })
+
+    # --------------------------------------------------------
+    # 2. NOKTALAMA SONRASI EKSİK BOŞLUK
+    #
+    # ".Merhaba" -> ". Merhaba"
+    #
+    # URL'ler zaten korundu.
+    # --------------------------------------------------------
+
+    pattern = r"([.!?,;:])([A-Za-zÇĞİÖŞÜçğıöşü])"
+
+    for match in re.finditer(
+        pattern,
+        working_text
+    ):
+
+        punctuation = match.group(1)
+
+        letter = match.group(2)
+
+        # Büyük harfle başlayan kısaltmalar:
+        #
+        # Ö.M.
+        # Ö.S.
+        # A.B.
+        # A.Ş.
+        #
+        # Bunları hata kabul etmiyoruz.
+
+        if punctuation == "." and letter.isupper():
+
+            before = working_text[
+                max(
+                    0,
+                    match.start() - 2
+                ):
+                match.start()
+            ]
+
+            if re.search(
+                r"[A-ZÇĞİÖŞÜ]\.",
+                before
+            ):
+                continue
+
+            # Tek harfli büyük harfli kısaltmalar
+            continue
+
+        errors.append({
+            "type": "noktalama sonrası eksik boşluk",
+            "original": match.group(0),
+            "suggestion": (
+                punctuation +
+                " " +
+                letter
+            ),
+            "context": get_context(
+                working_text,
+                match.start(),
+                match.end()
+            )
+        })
+
+    # --------------------------------------------------------
+    # 3. KELİME + SAYI BİRLEŞMESİ
+    #
+    # araçlarının10 -> araçlarının 10
+    # --------------------------------------------------------
+
+    pattern = (
+        r"([A-Za-zÇĞİÖŞÜçğıöşü])(\d+)"
+    )
+
+    for match in re.finditer(
+        pattern,
+        working_text
+    ):
+
+        letter = match.group(1)
+
+        number = match.group(2)
+
+        # 4 haneli yılları otomatik hata kabul etmiyoruz.
+
+        if len(number) == 4:
+            continue
+
+        errors.append({
+            "type": "kelime-sayı birleşmesi",
+            "original": match.group(0),
+            "suggestion": (
+                letter +
+                " " +
+                number
+            ),
+            "context": get_context(
+                working_text,
+                match.start(),
+                match.end()
+            )
+        })
+
+    # --------------------------------------------------------
+    # 4. SAYI + KELİME BİRLEŞMESİ
+    #
+    # 10kişi -> 10 kişi
+    # --------------------------------------------------------
+
+    pattern = (
+        r"(\d)([A-Za-zÇĞİÖŞÜçğıöşü])"
+    )
+
+    for match in re.finditer(
+        pattern,
+        working_text
+    ):
+
+        # Saat kontrolü
+
+        before = working_text[
+            max(
+                0,
+                match.start() - 3
+            ):
+            match.start() + 3
+        ]
+
+        if ":" in before:
+            continue
+
+        errors.append({
+            "type": "sayı-kelime birleşmesi",
+            "original": match.group(0),
+            "suggestion": (
+                match.group(1) +
+                " " +
+                match.group(2)
+            ),
+            "context": get_context(
+                working_text,
+                match.start(),
+                match.end()
+            )
+        })
+
+    # --------------------------------------------------------
+    # 5. YURT DIŞI
+    # --------------------------------------------------------
+
+    patterns = [
+        (
+            r"\byurtdışına\b",
+            "yurt dışına"
+        ),
+        (
+            r"\byurtdışında\b",
+            "yurt dışında"
+        ),
+        (
+            r"\byurtdışından\b",
+            "yurt dışından"
+        ),
+        (
+            r"\byurtdışı\b",
+            "yurt dışı"
+        )
+    ]
+
+    for pattern, suggestion in patterns:
+
+        for match in re.finditer(
+            pattern,
+            working_text,
+            flags=re.IGNORECASE
+        ):
+
+            errors.append({
+                "type": "kesin yazım hatası",
+                "original": match.group(0),
+                "suggestion": suggestion,
+                "context": get_context(
+                    working_text,
+                    match.start(),
+                    match.end()
+                )
+            })
+
+    # --------------------------------------------------------
+    # URL'LERİ GERİ KOY
+    # --------------------------------------------------------
+
+    for index, original in enumerate(
+        protected
+    ):
+
+        working_text = working_text.replace(
+            f"___WEBPROOF_URL_{index}___",
+            original
+        )
+
+    return remove_duplicate_errors(
+        errors
+    )
+
+
+# ============================================================
+# BBC HABER LİNKLERİ
 # ============================================================
 
 def get_article_urls():
@@ -343,26 +393,27 @@ def get_article_urls():
         ]:
             continue
 
-        if parsed.path.startswith(
+        if not parsed.path.startswith(
             "/turkce/articles/"
         ):
+            continue
 
-            clean_url = (
-                f"https://www.bbc.com"
-                f"{parsed.path}"
+        clean_url = (
+            "https://www.bbc.com" +
+            parsed.path
+        )
+
+        if clean_url not in urls:
+
+            urls.append(
+                clean_url
             )
-
-            if clean_url not in urls:
-
-                urls.append(
-                    clean_url
-                )
 
     return urls
 
 
 # ============================================================
-# HABER METNİNİ ÇIKAR
+# HABER METNİ
 # ============================================================
 
 def extract_article(url):
@@ -402,7 +453,9 @@ def extract_article(url):
 
         tag.decompose()
 
-    main = soup.find("main")
+    main = soup.find(
+        "main"
+    )
 
     if not main:
 
@@ -423,7 +476,9 @@ def extract_article(url):
 
     paragraphs = []
 
-    for p in main.find_all("p"):
+    for p in main.find_all(
+        "p"
+    ):
 
         text = p.get_text(
             " ",
@@ -462,32 +517,33 @@ def extract_article(url):
 
 
 # ============================================================
-# NVIDIA ANALİZİ
+# NVIDIA PROMPT
 # ============================================================
 
-def analyze_with_nvidia(article):
+def build_prompt(article):
 
-    prompt = f"""
-Aşağıdaki Türkçe haber metnini profesyonel bir Türkçe
-haber editörü olarak kontrol et.
+    return f"""
+Sen profesyonel bir Türkçe haber editörüsün.
 
-SADECE KESİN OLDUĞUNDAN EMİN OLDUĞUN HATALARI BUL.
+Aşağıdaki haber metnini yalnızca KESİN hatalar açısından kontrol et.
 
-Kontrol et:
+SADECE ŞUNLARI BUL:
 
 - Kesin yazım hataları
 - Kesin dilbilgisi hataları
 - Kesin noktalama hataları
-- Açık harf/klavye hataları
+- Açık harf veya klavye hataları
 - Açık boşluk hataları
 
-ÇOK ÖNEMLİ:
+KESİNLİK KURALI:
 
-Emin olmadığın hiçbir şeyi hata olarak bildirme.
+Emin değilsen HATA BİLDİRME.
 
-Stil tercihini hata olarak bildirme.
+Stil tercihini hata olarak değerlendirme.
 
-Cümleyi daha güzel hale getirmek için değiştirme.
+Cümleyi daha güzel hale getirme.
+
+Gazetecilik üslubunu değiştirme.
 
 Anlamı değiştirme.
 
@@ -501,77 +557,226 @@ Yer isimlerini değiştirme.
 
 Siyasi ifadeleri değiştirme.
 
-Gazetecilik üslubunu değiştirme.
+Bir kelimenin doğru olup olmadığından emin değilsen
+onu hata olarak bildirme.
 
-Sadece gerçekten yanlış olduğundan emin olduğun
-hataları bildir.
+ÇIKTI KURALI:
 
-ÇIKTI FORMATI:
-
-Hata varsa:
-
-HATA
-Orijinal: ...
-Öneri: ...
-Açıklama: ...
-
-Kesin hata yoksa:
+Kesin hata yoksa SADECE:
 
 HATA YOK
 
-SADECE nihai sonucu ver.
+Kesin hata varsa yalnızca şu formatı kullan:
 
-Düşünme süreci yazma.
+HATA
+Orijinal: [hatalı bölüm]
+Öneri: [doğru biçim]
+Açıklama: [çok kısa açıklama]
+
+Birden fazla hata varsa aynı formatı tekrar et.
+
+ÇOK ÖNEMLİ:
+
+Markdown kullanma.
+
+JSON kullanma.
+
+İngilizce kullanma.
+
+Düşünme sürecini yazma.
+
 Reasoning yazma.
+
 Thinking process yazma.
-İngilizce açıklama yazma.
+
+Ara değerlendirme yazma.
+
+Sadece nihai sonucu ver.
 
 HABER BAŞLIĞI:
-
 {article["title"]}
 
 HABER METNİ:
-
 {article["text"]}
 """
 
-    response = client.chat.completions.create(
 
-        model=MODEL,
+# ============================================================
+# NVIDIA ÇIKTISINI TEMİZLE
+# ============================================================
 
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Sen profesyonel bir Türkçe "
-                    "haber editörüsün. "
-                    "Sadece nihai sonucu ver. "
-                    "İç düşünme veya reasoning "
-                    "üretme."
-                )
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
+def clean_nvidia_output(output):
 
-        temperature=0.1,
+    if not output:
+        return None
 
-        top_p=0.9,
+    text = output.strip()
 
-        max_tokens=3000,
+    # --------------------------------------------------------
+    # Model bazen </think> bırakabiliyor.
+    # --------------------------------------------------------
 
-        stream=False,
+    if "</think>" in text:
 
-        extra_body={
-            "chat_template_kwargs": {
-                "enable_thinking": False
-            }
-        }
+        text = text.split(
+            "</think>",
+            1
+        )[1].strip()
+
+    # --------------------------------------------------------
+    # Boş / anlamsız çıktı
+    # --------------------------------------------------------
+
+    if len(text) < 3:
+        return None
+
+    # --------------------------------------------------------
+    # Beklenen temiz sonuç
+    # --------------------------------------------------------
+
+    if text.upper() == "HATA YOK":
+
+        return "HATA YOK"
+
+    # --------------------------------------------------------
+    # HATA formatı var mı?
+    # --------------------------------------------------------
+
+    if "HATA" in text and (
+        "Orijinal:" in text or
+        "Öneri:" in text
+    ):
+
+        return text
+
+    # --------------------------------------------------------
+    # NVIDIA bazen açıklama ekleyebilir.
+    # Eğer açıkça HATA YOK diyorsa onu al.
+    # --------------------------------------------------------
+
+    if re.search(
+        r"\bHATA\s+YOK\b",
+        text,
+        flags=re.IGNORECASE
+    ):
+
+        return "HATA YOK"
+
+    # --------------------------------------------------------
+    # Beklenmeyen / bozuk çıktı
+    # --------------------------------------------------------
+
+    return None
+
+
+# ============================================================
+# NVIDIA ANALİZİ
+# ============================================================
+
+def analyze_with_nvidia(article):
+
+    prompt = build_prompt(
+        article
     )
 
-    return response.choices[0].message.content
+    for attempt in range(1, 3):
+
+        try:
+
+            response = client.chat.completions.create(
+
+                model=MODEL,
+
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Profesyonel Türkçe haber "
+                            "editörü olarak çalış. "
+                            "Sadece nihai sonucu ver. "
+                            "İç düşünme veya reasoning "
+                            "gösterme."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+
+                temperature=0.0,
+
+                top_p=0.9,
+
+                max_tokens=1500,
+
+                stream=False,
+
+                extra_body={
+                    "chat_template_kwargs": {
+                        "enable_thinking": False
+                    }
+                }
+            )
+
+            raw = response.choices[
+                0
+            ].message.content
+
+            cleaned = clean_nvidia_output(
+                raw
+            )
+
+            if cleaned:
+
+                return cleaned
+
+            print(
+                "⚠️ NVIDIA beklenmeyen "
+                "format döndürdü."
+            )
+
+            if attempt == 1:
+
+                print(
+                    "🔄 NVIDIA tekrar deneniyor..."
+                )
+
+        except Exception as e:
+
+            error_text = str(e)
+
+            if "429" in error_text:
+
+                return (
+                    "NVIDIA KOTA/LİMİT: "
+                    "Bu haber analiz edilemedi."
+                )
+
+            if "410" in error_text:
+
+                return (
+                    "NVIDIA MODEL HATASI: "
+                    "Model kullanılamıyor."
+                )
+
+            print(
+                f"NVIDIA hata "
+                f"(deneme {attempt}): "
+                f"{error_text}"
+            )
+
+            if attempt == 2:
+
+                return (
+                    "NVIDIA ANALİZİ "
+                    "TAMAMLANAMADI."
+                )
+
+    return (
+        "NVIDIA ANALİZİ "
+        "TAMAMLANAMADI."
+    )
 
 
 # ============================================================
@@ -581,7 +786,8 @@ HABER METNİ:
 print()
 print("========================================")
 print("WEBPROOF AI")
-print("GELİŞMİŞ KURAL MOTORU + NVIDIA")
+print("KURAL MOTORU + NVIDIA")
+print("ÇIKTI KONTROLLÜ SÜRÜM")
 print("========================================")
 print()
 
@@ -594,7 +800,7 @@ try:
         f"{len(urls)}"
     )
 
-    urls = urls[:5]
+    urls = urls[:MAX_ARTICLES]
 
     successful = 0
 
@@ -731,7 +937,7 @@ try:
             error_text = str(e)
 
             print()
-            print("❌ HATA")
+            print("❌ HABER HATASI")
 
             print(
                 "----------------------------------------"
@@ -739,21 +945,9 @@ try:
 
             print(error_text)
 
-            if "429" in error_text:
-
-                print()
-                print(
-                    "⚠️ NVIDIA kota/limit "
-                    "nedeniyle analiz yapılamadı."
-                )
-
-            elif "410" in error_text:
-
-                print()
-                print(
-                    "⚠️ NVIDIA modeli artık "
-                    "kullanılamıyor."
-                )
+    # --------------------------------------------------------
+    # GENEL SONUÇ
+    # --------------------------------------------------------
 
     print()
     print("========================================")
