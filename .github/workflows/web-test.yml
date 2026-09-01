@@ -1,10 +1,10 @@
-name: WebProof AI - BBC Link Crawler
+name: WebProof AI - BBC Haber Metin Crawler
 
 on:
   workflow_dispatch:
 
 jobs:
-  crawler-test:
+  article-crawler:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,7 +18,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install beautifulsoup4
 
-      - name: BBC Türkçe bağlantılarını bul
+      - name: BBC haberlerini indir ve metinlerini çıkar
         run: |
           cat > crawler.py <<'PY'
           import urllib.request
@@ -29,32 +29,56 @@ jobs:
 
           print("======================================")
           print("WEBPROOF AI")
-          print("BBC TÜRKÇE LINK CRAWLER")
+          print("BBC HABER METİN CRAWLER")
           print("======================================")
           print("")
           print("Ana sayfa:", BASE_URL)
           print("")
-          print("BBC Türkçe ana sayfası indiriliyor...")
 
-          request = urllib.request.Request(
-              BASE_URL,
-              headers={
-                  "User-Agent": "Mozilla/5.0"
-              }
-          )
+          def download_page(url):
 
-          with urllib.request.urlopen(
-              request,
-              timeout=30
-          ) as response:
-
-              html = response.read().decode(
-                  "utf-8",
-                  errors="ignore"
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "User-Agent": "Mozilla/5.0"
+                  }
               )
 
-          print("HTTP:", response.status)
-          print("HTML karakter sayısı:", len(html))
+              try:
+
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=30
+                  ) as response:
+
+                      html = response.read().decode(
+                          "utf-8",
+                          errors="ignore"
+                      )
+
+                      return response.status, html
+
+              except Exception as error:
+
+                  print("Sayfa indirilemedi:")
+                  print(error)
+                  return None, None
+
+
+          print("BBC Türkçe ana sayfası indiriliyor...")
+
+          status, html = download_page(BASE_URL)
+
+          if not html:
+              raise RuntimeError(
+                  "BBC ana sayfası indirilemedi."
+              )
+
+          print("HTTP:", status)
+          print(
+              "HTML karakter sayısı:",
+              len(html)
+          )
           print("")
 
           soup = BeautifulSoup(
@@ -64,7 +88,10 @@ jobs:
 
           links = []
 
-          for a in soup.find_all("a", href=True):
+          for a in soup.find_all(
+              "a",
+              href=True
+          ):
 
               href = a.get("href")
 
@@ -81,7 +108,9 @@ jobs:
               if parsed.netloc != "www.bbc.com":
                   continue
 
-              if not parsed.path.startswith("/turkce"):
+              if not parsed.path.startswith(
+                  "/turkce"
+              ):
                   continue
 
               clean_url = (
@@ -105,33 +134,6 @@ jobs:
               if clean_url == BASE_URL:
                   continue
 
-              if clean_url not in [
-                  item["url"] for item in links
-              ]:
-
-                  links.append({
-                      "url": clean_url,
-                      "text": text
-                  })
-
-          print("Toplam benzersiz BBC Türkçe bağlantısı:")
-          print(len(links))
-          print("")
-
-          print("======================================")
-          print("BULUNAN BAĞLANTILAR")
-          print("======================================")
-          print("")
-
-          article_candidates = []
-
-          for item in links:
-
-              url = item["url"]
-              text = item["text"]
-
-              path = urlparse(url).path
-
               article_words = [
                   "/articles/",
                   "/features/",
@@ -139,37 +141,207 @@ jobs:
               ]
 
               is_article = any(
-                  word in path
+                  word in parsed.path
                   for word in article_words
               )
 
-              if is_article:
+              if not is_article:
+                  continue
 
-                  article_candidates.append(item)
+              if clean_url in [
+                  item["url"]
+                  for item in links
+              ]:
+                  continue
+
+              links.append({
+                  "url": clean_url,
+                  "title": text
+              })
+
 
           print(
-              "Haber/makale adayı bağlantı sayısı:",
-              len(article_candidates)
+              "Bulunan haber adayı:",
+              len(links)
           )
 
           print("")
 
-          selected = article_candidates[:10]
+          selected = links[:5]
+
+          print(
+              "İlk",
+              len(selected),
+              "haber indirilecek."
+          )
+
+          print("")
+
+          successful_articles = []
 
           for index, item in enumerate(
               selected,
               start=1
           ):
 
-              print("--------------------------------------")
-              print(f"HABER ADAYI {index}")
-              print("BAŞLIK:", item["text"])
-              print("URL:", item["url"])
-              print("--------------------------------------")
+              url = item["url"]
+
+              print("======================================")
+              print(
+                  f"HABER {index}"
+              )
+              print("URL:", url)
               print("")
 
+              status, article_html = download_page(
+                  url
+              )
+
+              if not article_html:
+
+                  print(
+                      "SONUÇ: Haber indirilemedi."
+                  )
+                  print("")
+                  continue
+
+              print(
+                  "HTTP:",
+                  status
+              )
+
+              print(
+                  "HTML karakter sayısı:",
+                  len(article_html)
+              )
+
+              article_soup = BeautifulSoup(
+                  article_html,
+                  "html.parser"
+              )
+
+              for tag in article_soup([
+                  "script",
+                  "style",
+                  "noscript",
+                  "svg",
+                  "nav",
+                  "footer",
+                  "header",
+                  "form"
+              ]):
+
+                  tag.decompose()
+
+              title = ""
+
+              if article_soup.title:
+
+                  title = article_soup.title.get_text(
+                      " ",
+                      strip=True
+                  )
+
+              main = article_soup.find(
+                  "main"
+              )
+
+              if main:
+
+                  article_text = main.get_text(
+                      " ",
+                      strip=True
+                  )
+
+              else:
+
+                  article_text = article_soup.get_text(
+                      " ",
+                      strip=True
+                  )
+
+              article_text = " ".join(
+                  article_text.split()
+              )
+
+              print("")
+              print("SAYFA BAŞLIĞI:")
+              print(title)
+
+              print("")
+              print(
+                  "TEMİZ METİN KARAKTER SAYISI:",
+                  len(article_text)
+              )
+
+              if len(article_text) < 200:
+
+                  print("")
+                  print(
+                      "UYARI: Haber metni çok kısa."
+                  )
+
+              else:
+
+                  successful_articles.append({
+                      "url": url,
+                      "title": title,
+                      "text": article_text
+                  })
+
+                  print("")
+                  print(
+                      "METİN BAŞLANGICI:"
+                  )
+
+                  print(
+                      article_text[:1500]
+                  )
+
+              print("")
+
+
           print("======================================")
-          print("CRAWLER TESTİ TAMAMLANDI")
+          print("ÖZET")
+          print("======================================")
+          print("")
+
+          print(
+              "Toplam haber adayı:",
+              len(selected)
+          )
+
+          print(
+              "Başarıyla metni alınan haber:",
+              len(successful_articles)
+          )
+
+          print("")
+
+          for index, article in enumerate(
+              successful_articles,
+              start=1
+          ):
+
+              print(
+                  f"{index}.",
+                  article["title"]
+              )
+
+              print(
+                  "   Metin:",
+                  len(article["text"]),
+                  "karakter"
+              )
+
+              print(
+                  "   URL:",
+                  article["url"]
+              )
+
+          print("")
+          print("======================================")
+          print("HABER METİN CRAWLER TESTİ TAMAMLANDI")
           print("======================================")
           PY
 
