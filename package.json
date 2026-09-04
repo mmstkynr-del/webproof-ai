@@ -10,6 +10,7 @@
   "dependencies": {
     "agents": "latest",
     "@cloudflare/ai-chat": "latest",
+    "@ai-sdk/react": "latest",
     "ai": "^7.0.0",
     "workers-ai-provider": "latest",
     "zod": "latest"
