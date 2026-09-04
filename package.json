@@ -8,9 +8,13 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "agents": "^0.4.0"
+    "agents": "^0.4.1",
+    "@cloudflare/ai-chat": "latest",
+    "ai": "latest",
+    "workers-ai-provider": "latest",
+    "zod": "latest"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.129.0"
   }
 }
