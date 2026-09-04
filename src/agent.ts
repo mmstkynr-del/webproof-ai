@@ -1,6 +1,4 @@
 import { Agent } from "agents";
-import { createWorkersAI } from "workers-ai-provider";
-import { streamText } from "ai";
 
 export class MainAgent extends Agent {
   initialState = {
@@ -8,25 +6,33 @@ export class MainAgent extends Agent {
   };
 
   async onChatMessage() {
-    const workersai = createWorkersAI({
-      binding: this.env.AI
-    });
+    const response = await this.env.AI.run(
+      "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      {
+        messages: [
+          {
+            role: "system",
+            content:
+              "Sen WebProof AI'nin ana yapay zeka ajanısın. Kullanıcıya Türkçe, açık ve doğru cevap ver."
+          },
+          ...this.messages.map((message: any) => ({
+            role: message.role,
+            content:
+              typeof message.content === "string"
+                ? message.content
+                : JSON.stringify(message.content)
+          }))
+        ]
+      }
+    );
 
-    const result = streamText({
-      model: workersai("@cf/meta/llama-3.3-70b-instruct-fp8-fast"),
-      system: `
-Sen WebProof AI'nin ana yapay zeka ajanısın.
-
-Kullanıcının doğal dilde verdiği görevleri anlamaya çalış.
-Henüz araçların olmadığı için şimdilik yalnızca sohbet et.
-İleride web tarama, yazım kontrolü, fiyat takibi ve Telegram
-araçlarını kullanacaksın.
-
-Yapılmamış bir işlemi yapılmış gibi gösterme.
-`,
-      messages: this.messages
-    });
-
-    return result.toUIMessageStreamResponse();
+    return new Response(
+      JSON.stringify(response),
+      {
+        headers: {
+          "content-type": "application/json"
+        }
+      }
+    );
   }
 }
