@@ -4,5 +4,21 @@
   "compatibility_date": "2026-09-04",
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MAIN_AGENT",
+        "class_name": "MainAgent"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "MainAgent"
+      ]
+    }
   ]
 }
