@@ -16,11 +16,14 @@ export default {
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>WebProof AI</title>
 
 <style>
+
 * {
   box-sizing: border-box;
 }
@@ -102,7 +105,9 @@ button {
 button:disabled {
   opacity: .5;
 }
+
 </style>
+
 </head>
 
 <body>
@@ -128,7 +133,7 @@ button:disabled {
       id="input"
       placeholder="Bana bir görev ver..."
       autocomplete="off"
-    />
+    >
 
     <button id="send">
       Gönder
@@ -138,116 +143,168 @@ button:disabled {
 
 </div>
 
-<script>
+<script type="module">
 
-const input = document.getElementById("input");
-const send = document.getElementById("send");
-const messages = document.getElementById("messages");
+import { createElement } from "https://esm.sh/react@19";
+import { createRoot } from "https://esm.sh/react-dom@19/client";
+import { useEffect, useRef, useState } from "https://esm.sh/react@19";
+import { useAgent } from "https://esm.sh/agents@0.22.0/react";
+import { useAgentChat } from "https://esm.sh/@cloudflare/ai-chat@0.11.0/react";
 
-function addMessage(text, type) {
+function Chat() {
 
-  const element = document.createElement("div");
+  const agent = useAgent({
+    agent: "MainAgent",
+    name: "webproof-main"
+  });
 
-  element.className = "message " + type;
+  const {
+    messages,
+    sendMessage,
+    status
+  } = useAgentChat({
+    agent
+  });
 
-  element.textContent = text;
+  const inputRef = useRef(null);
+  const messagesRef = useRef(null);
 
-  messages.appendChild(element);
+  useEffect(() => {
 
-  messages.scrollTop = messages.scrollHeight;
+    if (!messagesRef.current) return;
 
-  return element;
-}
+    messagesRef.current.scrollTop =
+      messagesRef.current.scrollHeight;
 
-async function sendMessage() {
+  }, [messages]);
 
-  const text = input.value.trim();
+  function send() {
 
-  if (!text) return;
+    const input = inputRef.current;
 
-  addMessage(text, "user");
+    if (!input) return;
 
-  input.value = "";
+    const text = input.value.trim();
 
-  send.disabled = true;
+    if (!text) return;
 
-  const thinking = addMessage(
-    "Düşünüyorum...",
-    "assistant"
+    sendMessage({
+      text
+    });
+
+    input.value = "";
+
+  }
+
+  function keyDown(event) {
+
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+
+      event.preventDefault();
+
+      send();
+
+    }
+
+  }
+
+  return createElement(
+    "div",
+    {
+      style: {
+        display: "contents"
+      }
+    },
+
+    createElement(
+      "div",
+      {
+        ref: messagesRef,
+        id: "messages"
+      },
+
+      createElement(
+        "div",
+        {
+          className: "message assistant"
+        },
+        "Merhaba! Ben WebProof AI.\nBana istediğin görevi yazabilirsin."
+      ),
+
+      messages.map(function(message) {
+
+        const text = message.parts
+          ?.filter(function(part) {
+            return part.type === "text";
+          })
+          .map(function(part) {
+            return part.text;
+          })
+          .join("") || "";
+
+        if (!text) return null;
+
+        return createElement(
+          "div",
+          {
+            key: message.id,
+            className:
+              "message " +
+              (message.role === "user"
+                ? "user"
+                : "assistant")
+          },
+          text
+        );
+
+      })
+
+    ),
+
+    createElement(
+      "div",
+      {
+        className: "input-area"
+      },
+
+      createElement(
+        "input",
+        {
+          ref: inputRef,
+          id: "input",
+          placeholder: "Bana bir görev ver...",
+          autoComplete: "off",
+          onKeyDown: keyDown
+        }
+      ),
+
+      createElement(
+        "button",
+        {
+          id: "send",
+          disabled:
+            status === "streaming" ||
+            status === "submitted",
+          onClick: send
+        },
+        status === "streaming"
+          ? "Düşünüyor..."
+          : "Gönder"
+      )
+
+    )
+
   );
 
-  try {
-
-    const response = await fetch(
-      "/agents/main-agent",
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json"
-        },
-
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "user",
-              content: text
-            }
-          ]
-        })
-      }
-    );
-
-    const result = await response.text();
-
-    thinking.remove();
-
-    if (!response.ok) {
-
-      addMessage(
-        "Hata: " + result,
-        "assistant"
-      );
-
-    } else {
-
-      addMessage(
-        result,
-        "assistant"
-      );
-
-    }
-
-  } catch (error) {
-
-    thinking.remove();
-
-    addMessage(
-      "Bağlantı hatası oluştu.",
-      "assistant"
-    );
-
-  }
-
-  send.disabled = false;
-
-  input.focus();
 }
 
-send.addEventListener(
-  "click",
-  sendMessage
-);
-
-input.addEventListener(
-  "keydown",
-  function(event) {
-
-    if (event.key === "Enter") {
-      sendMessage();
-    }
-
-  }
+createRoot(
+  document.querySelector(".app")
+).render(
+  createElement(Chat)
 );
 
 </script>
@@ -259,5 +316,6 @@ input.addEventListener(
         "content-type": "text/html; charset=UTF-8"
       }
     });
+
   }
 };
