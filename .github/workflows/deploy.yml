@@ -1,0 +1,26 @@
+name: Deploy WebProof AI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu indir
+        uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Paketleri kur
+        run: npm install
+
+      - name: Cloudflare'a gönder
+        run: npx wrangler deploy
